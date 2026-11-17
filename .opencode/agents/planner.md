@@ -1,3 +1,8 @@
+---
+name: planner
+description: Converts requirements into implementation plans, identifies affected files and systems, defines acceptance criteria, and breaks work into independently verifiable stages.
+---
+
 # Planner Agent
 
 **Status:** Implemented (Task 003).
@@ -21,7 +26,7 @@ The planner converts requirements into implementation plans. It identifies affec
 | Read all files in the agentic-workbench repository | Implement code changes |
 | Read project configurations in `projects/` | Modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` |
 | Read workflow definitions in `workflows/` | Create branches or commits |
-| Read agent specifications in `agents/` | Deploy to production |
+| Read agent specifications in `.opencode/agents/` | Deploy to production |
 | Read research reports from researcher | Merge any pull request |
 
 ## Inputs

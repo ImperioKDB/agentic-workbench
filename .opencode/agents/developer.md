@@ -1,3 +1,8 @@
+---
+name: developer
+description: Implements approved changes following project conventions, creates isolated branches, writes maintainable code, and avoids unrelated modifications.
+---
+
 # Developer Agent
 
 **Status:** Implemented (Task 003).

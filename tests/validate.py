@@ -60,11 +60,11 @@ def main():
     agent_names = [a.get("name") for a in agents_config] if isinstance(agents_config, list) else []
     for name in expected_agents:
         check(name in agent_names, f"Agent '{name}' defined in opencode.json")
-        check(check_file(f"agents/{name}.md"), f"Agent file agents/{name}.md exists")
+        check(check_file(f".opencode/agents/{name}.md"), f"Agent file .opencode/agents/{name}.md exists")
 
     # 4. Agent specs are not placeholders
     for name in expected_agents:
-        content = read_file(f"agents/{name}.md")
+        content = read_file(f".opencode/agents/{name}.md")
         check("Placeholder — not implemented" not in content, f"Agent '{name}' is implemented (not placeholder)")
         check("**Status:** Implemented" in content, f"Agent '{name}' status is Implemented")
 

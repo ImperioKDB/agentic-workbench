@@ -1,3 +1,8 @@
+---
+name: qa-engineer
+description: Runs relevant tests, validates expected behaviour, detects regressions, verifies builds and configurations, and produces test evidence.
+---
+
 # QA Engineer Agent
 
 **Status:** Implemented (Task 003).

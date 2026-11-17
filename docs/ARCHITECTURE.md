@@ -18,7 +18,7 @@ User request → Orchestrator → Specialist agents → Orchestrator → Human r
 
 Specialist agents (researcher, planner, developer, qa-engineer, reviewer) report back to the orchestrator, never directly to each other. The orchestrator sequences handoffs according to the applicable workflow definition and tracks task state and dependencies.
 
-Handoff rules are defined in each agent specification (`agents/*.md`). Key handoffs:
+Handoff rules are defined in each agent specification (`.opencode/agents/*.md`). Key handoffs:
 - Orchestrator → Researcher (investigation needed)
 - Orchestrator → Planner (planning needed)
 - Orchestrator → Developer (approved implementation ready)
@@ -51,6 +51,17 @@ The following operations require explicit human approval:
 
 No agent may bypass these gates. `opencode.json` records `no_autonomous_merge: true` and `no_autonomous_deploy: true`.
 
+### Approval gate enforcement — OpenCode v2.3.0 native capability
+
+**OpenCode v2.3.0 does NOT natively enforce human approval boundaries before write operations.** Runtime verification (Task 003C Test E) confirmed that agents proceeded with file modifications without requesting human approval. Approval gates documented in agent specifications and workflow definitions are **advisory only** — enforced through human review of agent outputs and PR-based workflows, not by the OpenCode system itself.
+
+**Mitigation:** Use PR-based workflows with human review before merge, and branch protection on `main` where available.
+
+## Delegation model — verified
+
+Task 003C runtime verification (Test C) confirmed that the Orchestrator (a custom agent in `.opencode/agents/orchestrator.md`) can invoke custom Researcher and Planner agents via OpenCode's native `opencode run --agent <name>` mechanism. Both agents returned structured outputs that the Orchestrator collected and reported separately. All six agents run with `mode: primary` as registered in their YAML frontmatter.
+
+
 ## Repository isolation model
 
 This repository (`ImperioKDB/agentic-workbench`) is independent of:
@@ -68,4 +79,4 @@ No cross-repository writes are performed by this project. Project configurations
 - Repository metadata (owner, name, visibility, default branch)
 - Security boundaries and approval gates
 
-Agent specifications live in `agents/*.md`. Workflow definitions live in `workflows/*/README.md`. Project configurations live in `projects/*/config.json` with a registry at `projects/registry.json`.
+Agent specifications live in `.opencode/agents/*.md`. Workflow definitions live in `workflows/*/README.md`. Project configurations live in `projects/*/config.json` with a registry at `projects/registry.json`.
