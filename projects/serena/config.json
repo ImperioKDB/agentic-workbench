@@ -1,0 +1,39 @@
+{
+  "name": "serena",
+  "repository": {
+    "owner": "ImperioKDB",
+    "name": "Serena",
+    "url": "https://github.com/ImperioKDB/Serena.git",
+    "private": false
+  },
+  "purpose": "Serena project — tool integration and workflow support.",
+  "main_technologies": [],
+  "important_directories": [],
+  "project_specific_instructions": [
+    "No credential printing or secret handling.",
+    "All writes require human approval.",
+    "Read-only access by default for research and planning."
+  ],
+  "testing_requirements": [
+    "Verify configuration validity before merge."
+  ],
+  "deployment_restrictions": [
+    "No automatic deployments.",
+    "Deployment only when separately authorized by a human."
+  ],
+  "security_considerations": [
+    "No credentials in committed files.",
+    "Least-privilege agent permissions."
+  ],
+  "reporting_requirements": [
+    "Reports published to ImperioKDB/Updates on dedicated branches.",
+    "No secrets in reports."
+  ],
+  "boundaries": {
+    "do_not_modify_without_approval": true,
+    "no_autonomous_merge": true,
+    "no_autonomous_deploy": true,
+    "no_credential_printing": true,
+    "no_secret_in_reports": true
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "name": "resource-centre",
+  "repository": {
+    "owner": "ImperioKDB",
+    "name": "Scholars-Resource-Centre",
+    "url": "https://github.com/ImperioKDB/Scholars-Resource-Centre.git",
+    "private": false
+  },
+  "purpose": "Resource centre CMS for scholarship and educational content management.",
+  "main_technologies": [
+    "TypeScript",
+    "Next.js",
+    "Supabase",
+    "Tailwind CSS"
+  ],
+  "important_directories": [
+    "app/",
+    "components/",
+    "lib/",
+    "supabase/",
+    "public/",
+    "scripts/"
+  ],
+  "project_specific_instructions": [
+    "Do not modify production databases.",
+    "Do not trigger deployments.",
+    "No credential printing or secret handling.",
+    "All writes require human approval.",
+    "Read-only access by default for research and planning."
+  ],
+  "testing_requirements": [
+    "Run vitest test suite before merge.",
+    "Verify TypeScript compilation passes.",
+    "Run security audit for credential exposure."
+  ],
+  "deployment_restrictions": [
+    "No automatic deployments.",
+    "Deployment only when separately authorized by a human.",
+    "No destructive database operations without explicit approval."
+  ],
+  "security_considerations": [
+    "No credentials in committed files.",
+    "Least-privilege agent permissions.",
+    "Read-only defaults for research and planning.",
+    "Explicit write boundaries for development."
+  ],
+  "reporting_requirements": [
+    "Reports published to ImperioKDB/Updates on dedicated branches.",
+    "Reporting pull requests not merged without human approval.",
+    "No secrets in reports."
+  ],
+  "boundaries": {
+    "do_not_modify_without_approval": true,
+    "no_autonomous_merge": true,
+    "no_autonomous_deploy": true,
+    "no_credential_printing": true,
+    "no_secret_in_reports": true
+  }
+}

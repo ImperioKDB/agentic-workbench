@@ -1,0 +1,37 @@
+{
+  "registry_version": "0.1.0",
+  "description": "Project registration index for the Personal Agentic Workbench.",
+  "projects": [
+    {
+      "name": "scholars",
+      "config": "projects/scholars/config.json",
+      "repository": "ImperioKDB/Scholars",
+      "status": "registered"
+    },
+    {
+      "name": "resource-centre",
+      "config": "projects/resource-centre/config.json",
+      "repository": "ImperioKDB/Scholars-Resource-Centre",
+      "status": "registered"
+    },
+    {
+      "name": "serena",
+      "config": "projects/serena/config.json",
+      "repository": "ImperioKDB/Serena",
+      "status": "registered"
+    },
+    {
+      "name": "ai-video-factory",
+      "config": "projects/ai-video-factory/config.json",
+      "repository": "ImperioKDB/AI-Video-Factory",
+      "status": "registered"
+    }
+  ],
+  "registration_rules": [
+    "Project registration must not automatically grant access to repositories or external services.",
+    "Each project must have its own configuration file describing repository URL, purpose, technologies, directories, instructions, testing requirements, deployment restrictions, security considerations, and reporting requirements.",
+    "No credentials or sensitive environment variables may be stored in project configuration files.",
+    "Project registration is descriptive only; it does not confer write access.",
+    "All writes to registered projects require explicit human approval."
+  ]
+}
