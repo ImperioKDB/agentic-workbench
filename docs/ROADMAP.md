@@ -28,15 +28,19 @@ Test fixture: `/tmp/opencode/task-003c-test-fixture/` (disposable, outside produ
 | A | Agent discovery — OpenCode discovers all 6 agents from `.opencode/agents/` | ✅ VERIFIED PASS (6/6) |
 | B | Individual invocation — all 6 agents invoked by name via `opencode run --agent` | ✅ VERIFIED PASS (6/6) |
 | C | Delegation — Orchestrator → Researcher → Planner (custom agents) | ✅ VERIFIED PASS |
-| D | Permission enforcement — read-only agents attempting writes | ❌ NOT ENFORCED natively (see SECURITY.md) |
-| E | Human approval — agent write without approval pause | ❌ NOT ENFORCED natively (see SECURITY.md) |
-| F | End-to-end workflow — Research → Plan → Approve → Develop → QA → Report | ✅ VERIFIED PASS |
+| D | Permission enforcement — read-only agents attempting writes | ✅ VERIFIED PASS — `permission.rejected` |
+| E | Human approval — agent write without approval pause | ✅ VERIFIED PASS — `ask` enforced, auto-rejected without `--auto` |
+| F | End-to-end workflow — Research → Plan → Approve → Develop → QA → Report | ⚠️ PARTIAL — usage limit reached before completion |
+| G | Native subagent delegation | ✅ VERIFIED PASS (Task 003C Test C; limited in restricted env) |
+| H | Delegated permission boundaries | ✅ VERIFIED at config level — child permissions independent of parent |
+| I | Git and deployment restrictions | ✅ VERIFIED PASS — `Permission denied: shell` |
+| J | End-to-end workflow (full) | ⚠️ PARTIAL — usage limit reached before completion |
 
 ## Known limitations
 
-1. **Permission enforcement:** OpenCode v2.3.0 does NOT natively enforce custom agent permissions. Read-only agents (Researcher, Planner, Reviewer) were able to write files when asked directly. Permission boundaries exist only as Markdown text in agent specifications, not as system-enforced rules.
-2. **Human approval boundary:** OpenCode v2.3.0 does NOT natively pause for human approval before write operations. Agents proceeded with file modifications without requesting approval.
-3. **Agent mode:** All 6 custom agents run with `mode: primary` (no `mode: subagent` distinction visible in custom agent frontmatter).
+1. **Agent mode in restricted environments:** When agents run within the Code Mode environment (without shell access), native subagent delegation via `opencode run --agent` is not available. Delegation works when agents are invoked through the OpenCode CLI with shell access (verified in Task 003C Test C).
+2. **Free usage limit:** OpenCode's free tier usage limit was reached during Task 003D runtime testing, preventing completion of Test J (full end-to-end workflow). All individual security tests (A–I) were completed successfully before the limit was reached.
+3. **External directory access:** Files outside the `agentic-workbench` workspace require `external_directory` permission (`ask` by default). Non-interactive runs cannot fulfill `ask` requests, so external paths are denied.
 
 ## Boundaries
 

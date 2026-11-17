@@ -1,6 +1,26 @@
 ---
 name: developer
 description: Implements approved changes following project conventions, creates isolated branches, writes maintainable code, and avoids unrelated modifications.
+mode: subagent
+permissions:
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: ask
+  - action: shell
+    resource: "*"
+    effect: ask
+  - action: subagent
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "git push *"
+    effect: deny
+  - action: shell
+    resource: "git commit *"
+    effect: deny
 ---
 
 # Developer Agent

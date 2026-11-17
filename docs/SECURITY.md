@@ -36,14 +36,30 @@ Documents credential handling, least-privilege principles, tool boundaries, huma
 
 ### Permission enforcement — OpenCode v2.3.0 native capability
 
-**OpenCode v2.3.0 does NOT natively enforce custom agent permissions.** Runtime verification (Task 003C Test D) confirmed:
+**OpenCode v2.3.0 DOES natively enforce custom agent permissions** through `opencode.jsonc` with `permissions` arrays and `agents.<id>.permissions`. Runtime verification (Task 003D Tests A–E) confirmed:
 
-- Researcher (declared read-only) was able to write to a file when asked directly.
-- Planner (declared read-only) was able to write to a file when asked directly.
-- Reviewer (declared review-only) was able to write to a file when asked directly.
-- Developer proceeded with file modifications without requesting human approval.
+- Researcher (declared read-only): `edit: deny *` — write attempts are blocked with `permission.rejected`
+- Planner (declared read-only): `edit: deny *` — write attempts are blocked with `permission.rejected`
+- Reviewer (declared review-only): `edit: deny *` — write attempts are blocked with `permission.rejected`
+- Developer: `edit: ask` — write attempts pause and request human approval; auto-rejected in non-interactive mode
+- QA Engineer: `edit: deny *`, `shell: deny *` (with `shell: node * -> ask`) — writes and non-test shell commands denied
+- Orchestrator: `edit: deny *`, `shell: deny *`, `subagent: researcher/planner/developer/qa-engineer/reviewer -> allow`, `subagent: * -> deny`
 
-Permission boundaries documented in agent specification Markdown files (the "Allowed / Not Allowed" tables) are **advisory only** — they are instructions the agent may choose to follow, not system-enforced rules. There is no native "ask" or "deny" enforcement for custom agents in OpenCode v2.3.0.
+Permissions are configured in `opencode.jsonc` (global rules) and in each agent's `.opencode/agents/<name>.md` frontmatter (agent-specific rules). Agent rules are appended after global rules and use each agent's own permission set — they are NOT inherited from a parent agent.
+
+## Native permission enforcement — verified test results
+
+| Test | Scenario | Result |
+|------|----------|--------|
+| A | Researcher write denial | ✅ VERIFIED PASS — `permission.rejected` |
+| B | Planner write denial | ✅ VERIFIED PASS — `permission.rejected` |
+| C | Reviewer write denial | ✅ VERIFIED PASS — `permission.rejected` |
+| D | Developer scope restriction | ✅ VERIFIED PASS — `permission.rejected` |
+| E2 | QA implementation modification denial | ✅ VERIFIED PASS — refused write |
+| F1 | Human approval denied (no --auto) | ✅ VERIFIED PASS — `permission.rejected`, auto-rejecting |
+| F2 | Human approval granted (--auto) | ✅ VERIFIED PASS — edit applied |
+| I | Git commit restriction | ✅ VERIFIED PASS — `Permission denied: shell` |
+
 
 **Mitigation:** Until OpenCode adds native permission enforcement for custom agents, rely on:
 1. Human review of agent outputs before accepting any file changes.

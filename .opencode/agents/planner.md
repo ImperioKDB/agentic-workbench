@@ -1,6 +1,20 @@
 ---
 name: planner
 description: Converts requirements into implementation plans, identifies affected files and systems, defines acceptance criteria, and breaks work into independently verifiable stages.
+mode: subagent
+permissions:
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: subagent
+    resource: "*"
+    effect: deny
 ---
 
 # Planner Agent

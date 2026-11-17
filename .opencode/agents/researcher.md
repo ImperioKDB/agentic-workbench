@@ -1,6 +1,20 @@
 ---
 name: researcher
 description: Investigates codebases and documentation, researches technical solutions, compares implementation approaches, identifies constraints and dependencies, and produces evidence-based research reports.
+mode: subagent
+permissions:
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: subagent
+    resource: "*"
+    effect: deny
 ---
 
 # Researcher Agent

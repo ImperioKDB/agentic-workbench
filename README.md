@@ -42,6 +42,17 @@ opencode run --agent researcher "Inspect the repository and report on the agent 
 
 Available agent names: `orchestrator`, `researcher`, `planner`, `developer`, `qa-engineer`, `reviewer`.
 
+### Permission Enforcement
+
+All six agents have natively enforced permissions configured in `opencode.jsonc` and their `.opencode/agents/<name>.md` frontmatter:
+
+- **Read-only agents** (Researcher, Planner, Reviewer): `edit`, `shell`, and `subagent` are `deny`
+- **Developer**: `edit` and `shell` are `ask` (require human approval); `git push`/`git commit` are `deny`
+- **QA Engineer**: `shell node` is `ask`; all other `shell`, `edit`, `subagent` are `deny`
+- **Orchestrator**: `subagent` to named specialists is `allow`; `subagent *` is `deny`; `edit`/`shell` are `deny`
+
+The `ask` effect pauses execution and requires human authorization before proceeding. The `deny` effect blocks the operation outright.
+
 ## Workflows
 
 | Workflow | Purpose | Status |

@@ -1,6 +1,23 @@
 ---
 name: qa-engineer
 description: Runs relevant tests, validates expected behaviour, detects regressions, verifies builds and configurations, and produces test evidence.
+mode: subagent
+permissions:
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "node *"
+    effect: ask
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: subagent
+    resource: "*"
+    effect: deny
 ---
 
 # QA Engineer Agent

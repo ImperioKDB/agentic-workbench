@@ -53,13 +53,30 @@ No agent may bypass these gates. `opencode.json` records `no_autonomous_merge: t
 
 ### Approval gate enforcement — OpenCode v2.3.0 native capability
 
-**OpenCode v2.3.0 does NOT natively enforce human approval boundaries before write operations.** Runtime verification (Task 003C Test E) confirmed that agents proceeded with file modifications without requesting human approval. Approval gates documented in agent specifications and workflow definitions are **advisory only** — enforced through human review of agent outputs and PR-based workflows, not by the OpenCode system itself.
+**OpenCode v2.3.0 DOES natively enforce human approval boundaries** through the `ask` permission effect in `opencode.jsonc`. Runtime verification (Task 003D Tests F1–F2) confirmed:
 
-**Mitigation:** Use PR-based workflows with human review before merge, and branch protection on `main` where available.
+- Without `--auto`: write attempts requiring approval are blocked with `permission.rejected` ("This non-interactive run cannot ask the user for permission, so the request was rejected")
+- With `--auto`: write attempts are auto-approved and proceed
+
+Approval gates are configured in `opencode.jsonc`:
+- Global: `edit * -> ask`, `shell * -> ask`, `subagent * -> ask`
+- Git operations: `git push * -> deny`, `git commit * -> deny`
+- Orchestrator: `edit * -> deny`, `shell * -> deny`
+- Specialist agents: `edit * -> deny`
+
+**No agent may bypass these gates.** The `ask` effect requires explicit authorization before the operation proceeds.
 
 ## Delegation model — verified
 
-Task 003C runtime verification (Test C) confirmed that the Orchestrator (a custom agent in `.opencode/agents/orchestrator.md`) can invoke custom Researcher and Planner agents via OpenCode's native `opencode run --agent <name>` mechanism. Both agents returned structured outputs that the Orchestrator collected and reported separately. All six agents run with `mode: primary` as registered in their YAML frontmatter.
+## Delegation model — verified
+
+**OpenCode v2.3.0 DOES support native subagent delegation.** Custom agents can be registered with `mode: subagent` in their YAML frontmatter, and parent agents can invoke them through OpenCode's native `subagent` permission mechanism. Runtime verification (Task 003C Test C; Task 003D Test H) confirmed:
+
+- Orchestrator (`mode: primary`) can invoke custom Researcher, Planner, Developer, QA Engineer, and Reviewer agents via `opencode run --agent <name>`
+- Specialist agents run with `mode: subagent` and use their own configured permissions (NOT inherited from the parent)
+- Delegation is an invocation right, not a privilege-escalation path: the Orchestrator's `subagent: researcher -> allow` grants only the right to invoke the Researcher; the Researcher's own `edit: deny *` remains effective
+
+Agent permissions are defined per-agent in `.opencode/agents/<name>.md` frontmatter and in `opencode.jsonc`. A child agent cannot bypass its own restrictions through delegation by a parent with broader permissions.
 
 
 ## Repository isolation model
