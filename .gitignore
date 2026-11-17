@@ -38,7 +38,9 @@ coverage/
 .nyc_output/
 
 # OpenCode
-.opencode/
+.opencode/*
+!.opencode/agents/
+!.opencode/agents/**
 
 # Misc
 *.tar.gz

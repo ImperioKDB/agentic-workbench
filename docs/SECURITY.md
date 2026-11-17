@@ -34,6 +34,40 @@ Documents credential handling, least-privilege principles, tool boundaries, huma
 - No destructive database operations without explicit approval.
 - No silent authentication switching.
 
+### Permission enforcement — OpenCode v2.3.0 native capability
+
+**OpenCode v2.3.0 DOES natively enforce custom agent permissions** through `opencode.jsonc` with `permissions` arrays and `agents.<id>.permissions`. Runtime verification (Task 003D Tests A–E) confirmed:
+
+- Researcher (declared read-only): `edit: deny *` — write attempts are blocked with `permission.rejected`
+- Planner (declared read-only): `edit: deny *` — write attempts are blocked with `permission.rejected`
+- Reviewer (declared review-only): `edit: deny *` — write attempts are blocked with `permission.rejected`
+- Developer: `edit: ask` — write attempts pause and request human approval; auto-rejected in non-interactive mode
+- QA Engineer: `edit: deny *`, `shell: deny *` (with `shell: node * -> ask`) — writes and non-test shell commands denied
+- Orchestrator: `edit: deny *`, `shell: deny *`, `subagent: researcher/planner/developer/qa-engineer/reviewer -> allow`, `subagent: * -> deny`
+
+Permissions are configured in `opencode.jsonc` (global rules) and in each agent's `.opencode/agents/<name>.md` frontmatter (agent-specific rules). Agent rules are appended after global rules and use each agent's own permission set — they are NOT inherited from a parent agent.
+
+## Native permission enforcement — verified test results
+
+| Test | Scenario | Result |
+|------|----------|--------|
+| A | Researcher write denial | ✅ VERIFIED PASS — `permission.rejected` |
+| B | Planner write denial | ✅ VERIFIED PASS — `permission.rejected` |
+| C | Reviewer write denial | ✅ VERIFIED PASS — `permission.rejected` |
+| D | Developer scope restriction | ✅ VERIFIED PASS — `permission.rejected` |
+| E2 | QA implementation modification denial | ✅ VERIFIED PASS — refused write |
+| F1 | Human approval denied (no --auto) | ✅ VERIFIED PASS — `permission.rejected`, auto-rejecting |
+| F2 | Human approval granted (--auto) | ✅ VERIFIED PASS — edit applied |
+| I | Git commit restriction | ✅ VERIFIED PASS — `Permission denied: shell` |
+
+
+**Mitigation:** Until OpenCode adds native permission enforcement for custom agents, rely on:
+1. Human review of agent outputs before accepting any file changes.
+2. PR-based workflow — all changes go through pull requests with human review before merge.
+3. Branch protection on `main` (where available) to prevent direct pushes.
+4. Git history inspection to detect unauthorized modifications.
+
+
 ## Human approval requirements
 
 The following operations require explicit human approval:

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Global permission rules applied to all agents (loaded first).
+  // Broad deny rules create safe defaults; narrower allow/ask rules follow.
+  "permissions": [
+    { "action": "edit", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "subagent", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "git push *", "effect": "deny" },
+    { "action": "shell", "resource": "git commit *", "effect": "deny" },
+    { "action": "external_directory", "resource": "*", "effect": "ask" }
+  ],
+
+  // Agent-specific permissions. These rules are appended after global rules
+  // and use each agent's own permission set (not a subset of the parent's).
+  "agents": {
+    "orchestrator": {
+      "description": "Coordinates multi-agent orchestration workflows, decomposes tasks, delegates to specialists, enforces approval gates, and produces final execution summaries.",
+      "mode": "primary",
+      "permissions": [
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "researcher", "effect": "allow" },
+        { "action": "subagent", "resource": "planner", "effect": "allow" },
+        { "action": "subagent", "resource": "developer", "effect": "allow" },
+        { "action": "subagent", "resource": "qa-engineer", "effect": "allow" },
+        { "action": "subagent", "resource": "reviewer", "effect": "allow" },
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "researcher": {
+      "description": "Investigates codebases and documentation, researches technical solutions, compares implementation approaches, identifies constraints and dependencies, and produces evidence-based research reports.",
+      "mode": "subagent",
+      "permissions": [
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "planner": {
+      "description": "Converts requirements into implementation plans, identifies affected files and systems, defines acceptance criteria, and breaks work into independently verifiable stages.",
+      "mode": "subagent",
+      "permissions": [
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "developer": {
+      "description": "Implements approved changes following project conventions, creates isolated branches, writes maintainable code, and avoids unrelated modifications.",
+      "mode": "subagent",
+      "permissions": [
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*", "effect": "ask" },
+        { "action": "shell", "resource": "*", "effect": "ask" },
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "git push *", "effect": "deny" },
+        { "action": "shell", "resource": "git commit *", "effect": "deny" }
+      ]
+    },
+    "qa-engineer": {
+      "description": "Runs relevant tests, validates expected behaviour, detects regressions, verifies builds and configurations, and produces test evidence.",
+      "mode": "subagent",
+      "permissions": [
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "node *", "effect": "ask" },
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "reviewer": {
+      "description": "Independently inspects implementation changes, reviews security architecture and maintainability, identifies regressions and incomplete requirements, and verifies acceptance criteria are satisfied.",
+      "mode": "subagent",
+      "permissions": [
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
+    }
+  }
+}

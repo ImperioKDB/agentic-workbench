@@ -5,32 +5,32 @@
   "agents": [
     {
       "name": "orchestrator",
-      "file": "agents/orchestrator.md",
+      "file": ".opencode/agents/orchestrator.md",
       "description": "Coordinates multi-agent orchestration workflows, decomposes tasks, delegates to specialists, enforces approval gates, and produces final execution summaries."
     },
     {
       "name": "researcher",
-      "file": "agents/researcher.md",
-      "description": "Investigates codebases and documentation, researches technical solutions, compares implementation approaches, and produces evidence-based research reports."
+      "file": ".opencode/agents/researcher.md",
+      "description": "Investigates codebases and documentation, researches technical solutions, compares implementation approaches, identifies constraints and dependencies, and produces evidence-based research reports."
     },
     {
       "name": "planner",
-      "file": "agents/planner.md",
+      "file": ".opencode/agents/planner.md",
       "description": "Converts requirements into implementation plans, identifies affected files and systems, defines acceptance criteria, and breaks work into independently verifiable stages."
     },
     {
       "name": "developer",
-      "file": "agents/developer.md",
+      "file": ".opencode/agents/developer.md",
       "description": "Implements approved changes following project conventions, creates isolated branches, writes maintainable code, and avoids unrelated modifications."
     },
     {
       "name": "qa-engineer",
-      "file": "agents/qa-engineer.md",
+      "file": ".opencode/agents/qa-engineer.md",
       "description": "Runs relevant tests, validates expected behaviour, detects regressions, verifies builds and configurations, and produces test evidence."
     },
     {
       "name": "reviewer",
-      "file": "agents/reviewer.md",
+      "file": ".opencode/agents/reviewer.md",
       "description": "Independently inspects implementation changes, reviews security architecture and maintainability, identifies regressions and incomplete requirements, and verifies acceptance criteria."
     }
   ],
