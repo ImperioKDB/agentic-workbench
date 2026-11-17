@@ -4,6 +4,9 @@ description: Coordinates multi-agent orchestration workflows, decomposes tasks, 
 mode: primary
 permissions:
   - action: subagent
+    resource: "*"
+    effect: deny
+  - action: subagent
     resource: researcher
     effect: allow
   - action: subagent
@@ -18,9 +21,6 @@ permissions:
   - action: subagent
     resource: reviewer
     effect: allow
-  - action: subagent
-    resource: "*"
-    effect: deny
   - action: edit
     resource: "*"
     effect: deny

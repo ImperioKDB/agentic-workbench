@@ -19,12 +19,12 @@
       "description": "Coordinates multi-agent orchestration workflows, decomposes tasks, delegates to specialists, enforces approval gates, and produces final execution summaries.",
       "mode": "primary",
       "permissions": [
+        { "action": "subagent", "resource": "*", "effect": "deny" },
         { "action": "subagent", "resource": "researcher", "effect": "allow" },
         { "action": "subagent", "resource": "planner", "effect": "allow" },
         { "action": "subagent", "resource": "developer", "effect": "allow" },
         { "action": "subagent", "resource": "qa-engineer", "effect": "allow" },
         { "action": "subagent", "resource": "reviewer", "effect": "allow" },
-        { "action": "subagent", "resource": "*", "effect": "deny" },
         { "action": "edit", "resource": "*", "effect": "deny" },
         { "action": "shell", "resource": "*", "effect": "deny" }
       ]

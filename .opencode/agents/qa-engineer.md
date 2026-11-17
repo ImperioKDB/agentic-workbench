@@ -7,11 +7,11 @@ permissions:
     resource: "*"
     effect: allow
   - action: shell
-    resource: "node *"
-    effect: ask
-  - action: shell
     resource: "*"
     effect: deny
+  - action: shell
+    resource: "node *"
+    effect: ask
   - action: edit
     resource: "*"
     effect: deny
