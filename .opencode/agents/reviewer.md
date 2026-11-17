@@ -1,3 +1,8 @@
+---
+name: reviewer
+description: Independently inspects implementation changes, reviews security architecture and maintainability, identifies regressions and incomplete requirements, and verifies acceptance criteria are satisfied.
+---
+
 # Reviewer Agent
 
 **Status:** Implemented (Task 003).

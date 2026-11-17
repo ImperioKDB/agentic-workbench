@@ -34,6 +34,24 @@ Documents credential handling, least-privilege principles, tool boundaries, huma
 - No destructive database operations without explicit approval.
 - No silent authentication switching.
 
+### Permission enforcement — OpenCode v2.3.0 native capability
+
+**OpenCode v2.3.0 does NOT natively enforce custom agent permissions.** Runtime verification (Task 003C Test D) confirmed:
+
+- Researcher (declared read-only) was able to write to a file when asked directly.
+- Planner (declared read-only) was able to write to a file when asked directly.
+- Reviewer (declared review-only) was able to write to a file when asked directly.
+- Developer proceeded with file modifications without requesting human approval.
+
+Permission boundaries documented in agent specification Markdown files (the "Allowed / Not Allowed" tables) are **advisory only** — they are instructions the agent may choose to follow, not system-enforced rules. There is no native "ask" or "deny" enforcement for custom agents in OpenCode v2.3.0.
+
+**Mitigation:** Until OpenCode adds native permission enforcement for custom agents, rely on:
+1. Human review of agent outputs before accepting any file changes.
+2. PR-based workflow — all changes go through pull requests with human review before merge.
+3. Branch protection on `main` (where available) to prevent direct pushes.
+4. Git history inspection to detect unauthorized modifications.
+
+
 ## Human approval requirements
 
 The following operations require explicit human approval:
