@@ -1,0 +1,43 @@
+{
+  "name": "personal-agentic-workbench",
+  "description": "Reusable OpenCode-native personal agentic orchestration and workflow system.",
+  "version": "0.1.0",
+  "agents": [
+    "agents/orchestrator.md",
+    "agents/researcher.md",
+    "agents/planner.md",
+    "agents/developer.md",
+    "agents/qa-engineer.md",
+    "agents/reviewer.md"
+  ],
+  "skills": [
+    "skills/README.md"
+  ],
+  "workflows": [
+    "workflows/development/",
+    "workflows/debugging/",
+    "workflows/auditing/",
+    "workflows/research/",
+    "workflows/documentation/"
+  ],
+  "projects": [
+    "projects/scholars/",
+    "projects/resource-centre/",
+    "projects/serena/",
+    "projects/ai-video-factory/"
+  ],
+  "repository": {
+    "owner": "ImperioKDB",
+    "name": "agentic-workbench",
+    "private": true,
+    "default_branch": "main"
+  },
+  "boundaries": {
+    "task_003": "not_started",
+    "do_not_modify": [
+      "ImperioKDB/Scholars",
+      "ImperioKDB/Scholars-Resource-Centre"
+    ],
+    "reporting_repo": "ImperioKDB/Updates"
+  }
+}
