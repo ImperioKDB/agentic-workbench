@@ -42,7 +42,8 @@
     "workflows/debugging/",
     "workflows/auditing/",
     "workflows/research/",
-    "workflows/documentation/"
+    "workflows/documentation/",
+    "workflows/modification/"
   ],
   "projects": [
     "projects/scholars/",
