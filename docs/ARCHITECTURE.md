@@ -18,7 +18,7 @@ User request → Orchestrator → Specialist agents → Orchestrator → Human r
 
 Specialist agents (researcher, planner, developer, qa-engineer, reviewer) report back to the orchestrator, never directly to each other. The orchestrator sequences handoffs according to the applicable workflow definition and tracks task state and dependencies.
 
-Handoff rules are defined in each agent specification (`agents/*.md`). Key handoffs:
+Handoff rules are defined in each agent specification (`.opencode/agents/*.md`). Key handoffs:
 - Orchestrator → Researcher (investigation needed)
 - Orchestrator → Planner (planning needed)
 - Orchestrator → Developer (approved implementation ready)
@@ -51,6 +51,34 @@ The following operations require explicit human approval:
 
 No agent may bypass these gates. `opencode.json` records `no_autonomous_merge: true` and `no_autonomous_deploy: true`.
 
+### Approval gate enforcement — OpenCode v2.3.0 native capability
+
+**OpenCode v2.3.0 DOES natively enforce human approval boundaries** through the `ask` permission effect in `opencode.jsonc`. Runtime verification (Task 003D Tests F1–F2) confirmed:
+
+- Without `--auto`: write attempts requiring approval are blocked with `permission.rejected` ("This non-interactive run cannot ask the user for permission, so the request was rejected")
+- With `--auto`: write attempts are auto-approved and proceed
+
+Approval gates are configured in `opencode.jsonc`:
+- Global: `edit * -> ask`, `shell * -> ask`, `subagent * -> ask`
+- Git operations: `git push * -> deny`, `git commit * -> deny`
+- Orchestrator: `edit * -> deny`, `shell * -> deny`
+- Specialist agents: `edit * -> deny`
+
+**No agent may bypass these gates.** The `ask` effect requires explicit authorization before the operation proceeds.
+
+## Delegation model — verified
+
+## Delegation model — verified
+
+**OpenCode v2.3.0 DOES support native subagent delegation.** Custom agents can be registered with `mode: subagent` in their YAML frontmatter, and parent agents can invoke them through OpenCode's native `subagent` permission mechanism. Runtime verification (Task 003C Test C; Task 003D Test H) confirmed:
+
+- Orchestrator (`mode: primary`) can invoke custom Researcher, Planner, Developer, QA Engineer, and Reviewer agents via `opencode run --agent <name>`
+- Specialist agents run with `mode: subagent` and use their own configured permissions (NOT inherited from the parent)
+- Delegation is an invocation right, not a privilege-escalation path: the Orchestrator's `subagent: researcher -> allow` grants only the right to invoke the Researcher; the Researcher's own `edit: deny *` remains effective
+
+Agent permissions are defined per-agent in `.opencode/agents/<name>.md` frontmatter and in `opencode.jsonc`. A child agent cannot bypass its own restrictions through delegation by a parent with broader permissions.
+
+
 ## Repository isolation model
 
 This repository (`ImperioKDB/agentic-workbench`) is independent of:
@@ -68,4 +96,4 @@ No cross-repository writes are performed by this project. Project configurations
 - Repository metadata (owner, name, visibility, default branch)
 - Security boundaries and approval gates
 
-Agent specifications live in `agents/*.md`. Workflow definitions live in `workflows/*/README.md`. Project configurations live in `projects/*/config.json` with a registry at `projects/registry.json`.
+Agent specifications live in `.opencode/agents/*.md`. Workflow definitions live in `workflows/*/README.md`. Project configurations live in `projects/*/config.json` with a registry at `projects/registry.json`.

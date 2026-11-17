@@ -1,3 +1,22 @@
+---
+name: reviewer
+description: Independently inspects implementation changes, reviews security architecture and maintainability, identifies regressions and incomplete requirements, and verifies acceptance criteria are satisfied.
+mode: subagent
+permissions:
+  - action: read
+    resource: "*"
+    effect: allow
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: subagent
+    resource: "*"
+    effect: deny
+---
+
 # Reviewer Agent
 
 **Status:** Implemented (Task 003).

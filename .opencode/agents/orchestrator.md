@@ -1,3 +1,34 @@
+---
+name: orchestrator
+description: Coordinates multi-agent orchestration workflows, decomposes tasks, delegates to specialists, enforces approval gates, and produces final execution summaries.
+mode: primary
+permissions:
+  - action: subagent
+    resource: researcher
+    effect: allow
+  - action: subagent
+    resource: planner
+    effect: allow
+  - action: subagent
+    resource: developer
+    effect: allow
+  - action: subagent
+    resource: qa-engineer
+    effect: allow
+  - action: subagent
+    resource: reviewer
+    effect: allow
+  - action: subagent
+    resource: "*"
+    effect: deny
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
+---
+
 # Orchestrator Agent
 
 **Status:** Implemented (Task 003).
@@ -30,7 +61,7 @@ The orchestrator coordinates multi-agent orchestration workflows across the Pers
 - User objectives and task requests
 - Applicable workflow definition (from `workflows/`)
 - Project configuration (from `projects/`)
-- Agent capabilities and boundaries (from `agents/` and `AGENTS.md`)
+- Agent capabilities and boundaries (from `.opencode/agents/` and `AGENTS.md`)
 
 ## Outputs
 

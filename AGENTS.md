@@ -8,16 +8,44 @@ This repository is an independent, private OpenCode-native agentic orchestration
 
 ## Agents
 
-Six agents are implemented in `agents/`:
+Six agents are registered in `.opencode/agents/` as OpenCode-native custom agent specifications with YAML frontmatter:
 
-- **Orchestrator** (`agents/orchestrator.md`) — coordinates workflows, decomposes tasks, delegates to specialists, enforces approval gates
-- **Researcher** (`agents/researcher.md`) — investigates codebases, researches solutions, produces evidence-based reports
-- **Planner** (`agents/planner.md`) — converts requirements into implementation plans with acceptance criteria
-- **Developer** (`agents/developer.md`) — implements approved changes on isolated branches
-- **QA Engineer** (`agents/qa-engineer.md`) — runs tests, validates behaviour, produces test evidence
-- **Reviewer** (`agents/reviewer.md`) — independently inspects changes, reviews security and maintainability
+- **Orchestrator** (`.opencode/agents/orchestrator.md`) — coordinates workflows, decomposes tasks, delegates to specialists, enforces approval gates
+- **Researcher** (`.opencode/agents/researcher.md`) — investigates codebases, researches solutions, produces evidence-based reports
+- **Planner** (`.opencode/agents/planner.md`) — converts requirements into implementation plans with acceptance criteria
+- **Developer** (`.opencode/agents/developer.md`) — implements approved changes on isolated branches
+- **QA Engineer** (`.opencode/agents/qa-engineer.md`) — runs tests, validates behaviour, produces test evidence
+- **Reviewer** (`.opencode/agents/reviewer.md`) — independently inspects changes, reviews security and maintainability
 
-Each agent specification defines its role, responsibilities, permissions, inputs, outputs, handoff rules, and safety boundaries.
+Each agent specification contains YAML frontmatter (`name`, `description`, `mode`, `permissions`) and defines its role, responsibilities, permissions, inputs, outputs, handoff rules, and safety boundaries.
+
+### Agent Modes and Permissions
+
+| Agent | Mode | Permissions Summary |
+|-------|------|---------------------|
+| Orchestrator | primary | Can invoke all 5 specialists as subagents; no edit/shell |
+| Researcher | subagent | Read-only; edit/shell/subagent denied |
+| Planner | subagent | Read-only; edit/shell/subagent denied |
+| Developer | subagent | Read all; edit/shell require approval; git push/commit denied |
+| QA Engineer | subagent | Read all; shell node requires approval; edit/shell/subagent denied |
+| Reviewer | subagent | Read-only; edit/shell/subagent denied |
+
+Permissions are natively enforced by OpenCode v2.3.0 through `opencode.jsonc` and each agent's frontmatter. The `ask` effect pauses for human approval; `deny` blocks the operation; `allow` permits without prompting.
+
+### Agent Invocation
+
+Agents are invoked via OpenCode's native command:
+
+```bash
+opencode run --agent <agent-name> "<message>"
+```
+
+Example:
+```bash
+opencode run --agent researcher "Inspect the repository and report on the agent configuration."
+```
+
+Available agent names: `orchestrator`, `researcher`, `planner`, `developer`, `qa-engineer`, `reviewer`.
 
 ## Workflows
 
@@ -57,7 +85,7 @@ The following operations require explicit human approval before execution:
 
 ## Directory conventions
 
-- `agents/` — OpenCode agent specifications (implemented).
+- `.opencode/agents/` — OpenCode native agent specifications (implemented; six agents registered with YAML frontmatter)
 - `skills/` — OpenCode skills directory (no skills installed).
 - `workflows/*/` — Workflow definitions (implemented).
 - `projects/*/` — Project-specific configurations (implemented; descriptive only).
