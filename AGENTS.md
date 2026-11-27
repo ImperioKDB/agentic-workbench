@@ -96,12 +96,12 @@ The following operations require explicit human approval before execution:
 3. Beginning Task 003 implementation stages that modify production projects.
 4. Rotating, revoking, or replacing any GitHub credential.
 5. Any write operation against `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
-6. Publishing execution reports to GitHub (including `ImperioKDB/Updates` reporting branches).
+6. Publishing execution reports to GitHub.
 
 ## Repository isolation
 
 - This repository (`agentic-workbench`) is isolated from `Scholars` and `Scholars-Resource-Centre`. Do not modify those repositories from this context.
-- Reporting for this project is published to `ImperioKDB/Updates` on dedicated branches (e.g. `report/agentic-workbench-task-002`). Do not merge reporting pull requests without human approval.
+- Reporting for this project is published to the designated feature branch on dedicated reporting branches. Do not merge reporting pull requests without human approval.
 
 ## Credential boundaries
 
@@ -129,6 +129,8 @@ Task 004 (runtime hardening and persistent reporting) is complete. Seven agents 
 
 Task 004.1 (audit remediation) is complete. Native OpenCode V2 permissions corrected (edit/shell/actions), validator repaired as dependency-free Node.js script, mandatory persistent reporting established, orchestration sequencing corrected, automated verification via GitHub Actions added.
 
-Task 004.2 (final security and runtime readiness corrections) is in progress. Correcting unrestricted shell permissions (approval-gated with last-match precedence), repairing secret scanning with git ls-files -z inventory, strengthening validation with rule precedence testing, reconciling reporting instructions, and preparing runtime readiness documentation.
+Task 004.2 (final security and runtime readiness corrections) is complete. Unrestricted shell permissions corrected (approval-gated with ask rules), secret scanning repaired with git ls-files -z inventory, validation strengthened with rule precedence testing, reporting instructions reconciled.
+
+Task 004.3 (targeted permission correction and live acceptance testing) is complete. Developer and QA Engineer edit permissions resolved to ask rules, shell commands resolved to ask rules, Git enumeration failure causes validation failure, reporting policy reconciled.
 
 Do not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` without explicit human approval.

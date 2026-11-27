@@ -66,7 +66,8 @@
     "task_003": "complete",
     "task_004": "complete",
     "task_004.1": "complete",
-    "task_004.2": "in_progress",
+    "task_004.2": "complete",
+    "task_004.3": "complete",
     "do_not_modify": [
       "ImperioKDB/Scholars",
       "ImperioKDB/Scholars-Resource-Centre"

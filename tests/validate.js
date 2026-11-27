@@ -2,17 +2,18 @@
 "use strict";
 
 /**
- * Task 004.2 validation script (dependency-free Node.js).
+ * Task 004.3 validation script (dependency-free Node.js).
  *
  * Validates the structural integrity of the Personal Agentic Workbench
  * implementation: workbench-manifest.json validity, agent files, workflow definitions,
- * project configurations, opencode.json V2 permissions, reporter registration,
- * dependency-aware orchestration, mandatory reporting, secret scanning,
+ * project configurations, opencode.json V2 permissions (including ask rules for
+ * approval-gated operations), reporter registration, dependency-aware orchestration,
+ * mandatory reporting, secret scanning with Git-tracked inventory,
  * and repository isolation.
  *
  * Uses cross-platform path APIs (node:path). Enumerates Git-tracked files via
- * `git ls-files -z` rather than recursive filesystem walking. Never prints matched
- * secret values. Exits nonzero when assertions fail.
+ * `git ls-files -z`. Fails with nonzero exit code if Git enumeration fails.
+ * Never prints matched secret values. Exits nonzero when assertions fail.
  */
 
 const fs = require("fs");
@@ -62,15 +63,15 @@ function getGitTrackedFiles() {
     });
     return output.split("\0").filter((f) => f.length > 0);
   } catch (e) {
-    // Fail safely: if git is unavailable, fall back to empty list
-    // and report the limitation
-    WARNINGS.push(`Could not enumerate Git-tracked files: ${e.message}`);
-    console.log(`WARNING: Could not enumerate Git-tracked files: ${e.message}`);
-    return [];
+    // FAIL: Git enumeration failure must cause validation failure
+    ERRORS.push(`Git enumeration failed: ${e.message}`);
+    console.log(`FAIL: Git enumeration failed: ${e.message}`);
+    return null;
   }
 }
 
 // Secret patterns — synthetic test patterns only, never actual credential values
+// Distinguishes harmless references to credential names from actual credential values
 const SECRET_PATTERNS = [
   /ghu_[A-Za-z0-9]{20,}/,
   /github_pat_[A-Za-z0-9_]{20,}/,
@@ -87,6 +88,11 @@ const SECRET_PATTERNS = [
 function scanForSecrets() {
   let secretFound = false;
   const files = getGitTrackedFiles();
+  if (files === null) {
+    // Git enumeration failed - already recorded error
+    check(false, "Git-tracked file enumeration must succeed for secret scanning");
+    return;
+  }
   for (const relPath of files) {
     const normalized = relPath.split(path.sep).join("/");
     // Skip the validator itself (contains regex patterns as strings)
@@ -153,34 +159,25 @@ function validateSecretFixtures() {
   check(!negativeDetected, "Negative secret fixture is not flagged (no false positives)");
 }
 
-// Helper: check if a permission rule exists in an agent's permission list
+// Helper: check if a specific permission rule exists
 function findPermission(agentPerms, effect, action, resource) {
   return agentPerms.some(
     (p) => p.effect === effect && p.action === action && p.resource === resource
   );
 }
 
-// Helper: check if ANY allow rule exists for an action (regardless of resource)
-function hasAllowForAction(agentPerms, action) {
-  return agentPerms.some((p) => p.effect === "allow" && p.action === action);
-}
-
-// Helper: check if ANY deny rule exists for an action
-function hasDenyForAction(agentPerms, action) {
-  return agentPerms.some((p) => p.effect === "deny" && p.action === action);
-}
-
-// Helper: verify last-match precedence — deny should come before allow for gated actions
-function checkLastMatchPrecedence(agentPerms, denyAction, allowAction) {
-  const denyIndex = agentPerms.findIndex(
-    (p) => p.effect === "deny" && p.action === denyAction
-  );
-  const allowIndex = agentPerms.findIndex(
-    (p) => p.effect === "allow" && p.action === allowAction
-  );
-  // For approval-gated actions, deny should appear before allow so that
-  // last-match precedence allows only explicitly listed resources
-  return denyIndex >= 0 && allowIndex >= 0 && denyIndex < allowIndex;
+// Helper: determine effective permission for an action+resource pair
+// using OpenCode V2 last-match precedence semantics
+function getEffectivePermission(agentPerms, action, resource) {
+  // Find all rules matching this action, sorted by index (last match wins)
+  let effective = null;
+  for (let i = 0; i < agentPerms.length; i++) {
+    const p = agentPerms[i];
+    if (p.action === action && (p.resource === resource || p.resource === "*")) {
+      effective = p.effect;
+    }
+  }
+  return effective; // "allow", "deny", "ask", or null
 }
 
 // ========================================================================
@@ -188,7 +185,7 @@ function checkLastMatchPrecedence(agentPerms, denyAction, allowAction) {
 // ========================================================================
 
 function main() {
-  console.log("=== Task 004.2 Validation ===\n");
+  console.log("=== Task 004.3 Validation ===\n");
 
   // 1. workbench-manifest.json valid JSON
   let config;
@@ -291,9 +288,9 @@ function main() {
   check(agentsMd.includes("direct GitHub report URL"), "AGENTS.md documents report URL requirement");
   // No conflicting separate-publication-approval requirement
   check(!/requires separate publication approval/i.test(agentsMd), "AGENTS.md does not require separate publication approval");
-check(!/requires additional approval for publication/i.test(agentsMd), "AGENTS.md does not require repeat publication approval");
+  check(!/requires additional approval for publication/i.test(agentsMd), "AGENTS.md does not require repeat publication approval");
   // No outdated ImperioKDB/Updates exclusive publishing requirement
-  check(!agentsMd.includes("publish Workbench reports exclusively to ImperioKDB/Updates"), "AGENTS.md does not require exclusive ImperioKDB/Updates publishing");
+  check(!/exclusive.*ImperioKDB\/Updates|ImperioKDB\/Updates.*exclusive/i.test(agentsMd), "AGENTS.md does not require exclusive ImperioKDB/Updates publishing");
 
   // 11. Secret scan — Git-based file inventory, includes reports, excludes only synthetic fixtures
   scanForSecrets();
@@ -340,48 +337,52 @@ check(!/requires additional approval for publication/i.test(agentsMd), "AGENTS.m
   check(!orchAllowActions.includes("write"), "Orchestrator does NOT have write permission");
   check(!orchAllowActions.includes("shell"), "Orchestrator does NOT have shell permission");
 
-  // 18. Developer uses correct native edit action (not write/create_branch)
+  // 18. Developer uses correct native edit action with ask (not allow)
   const developerPerms = (opencodeAgents.developer && opencodeAgents.developer.permissions) || [];
   const developerAllowActions = developerPerms
     .filter((p) => p.effect === "allow")
     .map((p) => p.action);
-  check(developerAllowActions.includes("edit"), "Developer has edit permission in opencode.json");
+  const developerAskActions = developerPerms
+    .filter((p) => p.effect === "ask")
+    .map((p) => p.action);
+  check(developerAskActions.includes("edit"), "Developer asks for edit permission (approval-gated)");
   check(!developerAllowActions.includes("write"), "Developer does NOT use invalid 'write' action");
   check(!developerAllowActions.includes("create_branch"), "Developer does NOT use invalid 'create_branch' action");
 
-  // 19. Developer shell is approval-gated: deny shell on * BEFORE specific allows (last-match precedence)
+  // 19. Developer edit: ordinary file edits resolve to "ask" (approval-gated)
+  const developerEditEffect = getEffectivePermission(developerPerms, "edit", "*");
+  check(developerEditEffect === "ask", "Developer ordinary file edits resolve to 'ask' (approval-gated)");
+
+  // 20. Developer credential file edits resolve to "deny"
+  const developerEnvEditEffect = getEffectivePermission(developerPerms, "edit", "*.env*");
+  const developerCredEditEffect = getEffectivePermission(developerPerms, "edit", "credentials.json");
+  const developerSecretEditEffect = getEffectivePermission(developerPerms, "edit", "*.secret*");
+  check(developerEnvEditEffect === "deny", "Developer credential file edits (*.env*) resolve to 'deny'");
+  check(developerCredEditEffect === "deny", "Developer credential file edits (credentials.json) resolve to 'deny'");
+  check(developerSecretEditEffect === "deny", "Developer credential file edits (*.secret*) resolve to 'deny'");
+
+  // 21. Developer shell: deny on "*" precedes ask for specific commands
   const developerShellDeny = developerPerms.find((p) => p.effect === "deny" && p.action === "shell" && p.resource === "*");
-  const developerShellAllows = developerPerms.filter((p) => p.effect === "allow" && p.action === "shell");
+  const developerShellAsks = developerPerms.filter((p) => p.effect === "ask" && p.action === "shell");
   check(!!developerShellDeny, "Developer denies shell on '*' (approval-gated)");
-  check(developerShellAllows.length > 0, "Developer allows specific shell commands only");
-  check(checkLastMatchPrecedence(developerPerms, "shell", "shell"), "Developer shell deny precedes allow (last-match precedence)");
-  // Verify only specifically justified commands are auto-allowed
-  const allowedShellResources = developerShellAllows.map((p) => p.resource);
+  check(developerShellAsks.length > 0, "Developer asks for specific shell commands only");
+  const developerShellAskResources = developerShellAsks.map((p) => p.resource);
   const harmlessCommands = ["node tests/validate.js", "npm test", "git status", "git diff"];
   for (const cmd of harmlessCommands) {
-    check(allowedShellResources.includes(cmd), `Developer shell allows '${cmd}'`);
+    check(developerShellAskResources.includes(cmd), `Developer shell asks for '${cmd}'`);
   }
-  // Verify NO blanket shell allow
-  check(!allowedShellResources.includes("*"), "Developer does NOT have blanket shell allow on '*'");
+  check(!developerShellAskResources.includes("*"), "Developer does NOT have blanket shell ask on '*'");
 
-  // 20. Developer denies credential file edits
-  const developerDenyEdits = developerPerms.filter(
-    (p) => p.effect === "deny" && p.action === "edit" && (p.resource === "*.env*" || p.resource === "credentials.json" || p.resource === "*.secret*")
-  );
-  check(developerDenyEdits.length >= 2, "Developer denies credential file edits (*.env*, credentials.json, *.secret*)");
+  // Verify deny precedes ask (last-match precedence: ask wins for specific commands, deny wins for arbitrary)
+  const denyShellIdx = developerPerms.findIndex((p) => p.effect === "deny" && p.action === "shell" && p.resource === "*");
+  const firstAskShellIdx = developerPerms.findIndex((p) => p.effect === "ask" && p.action === "shell");
+  check(denyShellIdx >= 0 && firstAskShellIdx >= 0 && denyShellIdx < firstAskShellIdx, "Developer shell deny precedes ask (last-match precedence)");
 
-  // 21. Developer denies autonomous merge, push, deploy, credential_retrieval
-  check(hasDenyForAction(developerPerms, "merge"), "Developer denies merge");
-  check(hasDenyForAction(developerPerms, "push"), "Developer denies push");
-  check(hasDenyForAction(developerPerms, "deploy"), "Developer denies deploy");
-  check(hasDenyForAction(developerPerms, "credential_retrieval"), "Developer denies credential_retrieval");
-
-  // 22. Developer edit requires approval (deny before allow pattern)
-  const developerEditDeny = developerPerms.find((p) => p.effect === "deny" && p.action === "edit" && p.resource === "*");
-  const developerEditAllow = developerPerms.find((p) => p.effect === "allow" && p.action === "edit" && p.resource === "*");
-  check(!!developerEditDeny, "Developer denies edit on '*' (approval-gated)");
-  check(!!developerEditAllow, "Developer allows edit on '*' with approval boundary documented");
-  check(developerPerms.indexOf(developerEditDeny) < developerPerms.indexOf(developerEditAllow), "Developer edit deny precedes allow (approval-gated)");
+  // 22. Developer denies autonomous merge, push, deploy, credential_retrieval
+  check(developerPerms.some((p) => p.effect === "deny" && p.action === "merge"), "Developer denies merge");
+  check(developerPerms.some((p) => p.effect === "deny" && p.action === "push"), "Developer denies push");
+  check(developerPerms.some((p) => p.effect === "deny" && p.action === "deploy"), "Developer denies deploy");
+  check(developerPerms.some((p) => p.effect === "deny" && p.action === "credential_retrieval"), "Developer denies credential_retrieval");
 
   // 23. Reporter uses correct native edit action (not write)
   const reporterPerms = (opencodeAgents.reporter && opencodeAgents.reporter.permissions) || [];
@@ -390,111 +391,117 @@ check(!/requires additional approval for publication/i.test(agentsMd), "AGENTS.m
   check(!reporterAllowActions.includes("write"), "Reporter does NOT use invalid 'write' action");
   check(!reporterAllowActions.includes("shell"), "Reporter does NOT have shell permission");
 
-  // 24. Reporter edit restricted to reports/* only
-  const reporterEditRules = reporterPerms.filter((p) => p.effect === "allow" && p.action === "edit");
-  check(reporterEditRules.length === 1, "Reporter has exactly one edit permission");
-  if (reporterEditRules.length > 0) {
-    check(reporterEditRules[0].resource === "reports/*", "Reporter edit restricted to reports/*");
-  }
+  // 24. Reporter report edits are permitted
+  const reporterReportEditEffect = getEffectivePermission(reporterPerms, "edit", "reports/*");
+  check(reporterReportEditEffect === "allow", "Reporter report edits are permitted (reports/*)");
 
-  // 25. Reporter denies shell, merge, push, deploy, credential_retrieval
-  check(hasDenyForAction(reporterPerms, "shell"), "Reporter denies shell");
-  check(hasDenyForAction(reporterPerms, "merge"), "Reporter denies merge");
-  check(hasDenyForAction(reporterPerms, "push"), "Reporter denies push");
-  check(hasDenyForAction(reporterPerms, "deploy"), "Reporter denies deploy");
-  check(hasDenyForAction(reporterPerms, "credential_retrieval"), "Reporter denies credential_retrieval");
+  // 25. Reporter edits outside reports/ are denied
+  const reporterOutsideEditEffect = getEffectivePermission(reporterPerms, "edit", "*");
+  check(reporterOutsideEditEffect === "deny", "Reporter edits outside reports/ are denied");
 
-  // 26. QA Engineer has shell permission but approval-gated
+  // 26. Reporter denies shell, merge, push, deploy, credential_retrieval
+  check(reporterPerms.some((p) => p.effect === "deny" && p.action === "shell"), "Reporter denies shell");
+  check(reporterPerms.some((p) => p.effect === "deny" && p.action === "merge"), "Reporter denies merge");
+  check(reporterPerms.some((p) => p.effect === "deny" && p.action === "push"), "Reporter denies push");
+  check(reporterPerms.some((p) => p.effect === "deny" && p.action === "deploy"), "Reporter denies deploy");
+  check(reporterPerms.some((p) => p.effect === "deny" && p.action === "credential_retrieval"), "Reporter denies credential_retrieval");
+
+  // 27. QA Engineer shell commands resolve to "ask" (approval-gated)
   const qaPerms = (opencodeAgents["qa-engineer"] && opencodeAgents["qa-engineer"].permissions) || [];
-  const qaAllowActions = qaPerms.filter((p) => p.effect === "allow").map((p) => p.action);
-  check(qaAllowActions.includes("shell"), "QA Engineer has shell permission in opencode.json");
-  const qaShellDeny = qaPerms.find((p) => p.effect === "deny" && p.action === "shell" && p.resource === "*");
-  const qaShellAllows = qaPerms.filter((p) => p.effect === "allow" && p.action === "shell");
-  check(!!qaShellDeny, "QA Engineer denies shell on '*' (approval-gated)");
-  check(qaShellAllows.length > 0, "QA Engineer allows specific shell commands only");
-  check(checkLastMatchPrecedence(qaPerms, "shell", "shell"), "QA Engineer shell deny precedes allow (last-match precedence)");
-  const qaShellResources = qaShellAllows.map((p) => p.resource);
+  const qaShellAsks = qaPerms.filter((p) => p.effect === "ask" && p.action === "shell");
+  check(qaShellAsks.length > 0, "QA Engineer asks for specific shell commands only");
+  const qaShellAskResources = qaShellAsks.map((p) => p.resource);
   const qaHarmlessCommands = ["node tests/validate.js", "npm test"];
   for (const cmd of qaHarmlessCommands) {
-    check(qaShellResources.includes(cmd), `QA Engineer shell allows '${cmd}'`);
+    check(qaShellAskResources.includes(cmd), `QA Engineer shell asks for '${cmd}'`);
   }
-  check(!qaShellResources.includes("*"), "QA Engineer does NOT have blanket shell allow on '*'");
+  check(!qaShellAskResources.includes("*"), "QA Engineer does NOT have blanket shell ask on '*'");
 
-  // 27. QA Engineer denies credential file edits and autonomous operations
-  const qaDenyEdits = qaPerms.filter(
-    (p) => p.effect === "deny" && p.action === "edit" && (p.resource === "*.env*" || p.resource === "credentials.json" || p.resource === "*.secret*")
-  );
-  check(qaDenyEdits.length >= 2, "QA Engineer denies credential file edits (*.env*, credentials.json, *.secret*)");
-  check(hasDenyForAction(qaPerms, "merge"), "QA Engineer denies merge");
-  check(hasDenyForAction(qaPerms, "push"), "QA Engineer denies push");
-  check(hasDenyForAction(qaPerms, "deploy"), "QA Engineer denies deploy");
-  check(hasDenyForAction(qaPerms, "credential_retrieval"), "QA Engineer denies credential_retrieval");
-  check(!qaAllowActions.includes("edit"), "QA Engineer does NOT have edit permission (no source modifications)");
+  // QA Engineer shell deny precedes ask
+  const qaShellDenyIdx = qaPerms.findIndex((p) => p.effect === "deny" && p.action === "shell" && p.resource === "*");
+  const qaFirstAskShellIdx = qaPerms.findIndex((p) => p.effect === "ask" && p.action === "shell");
+  check(qaShellDenyIdx >= 0 && qaFirstAskShellIdx >= 0 && qaShellDenyIdx < qaFirstAskShellIdx, "QA Engineer shell deny precedes ask (last-match precedence)");
 
-  // 28. No agent has external_directory access
+  // 28. QA Engineer denies credential file edits and autonomous operations
+  check(qaPerms.some((p) => p.effect === "deny" && p.action === "merge"), "QA Engineer denies merge");
+  check(qaPerms.some((p) => p.effect === "deny" && p.action === "push"), "QA Engineer denies push");
+  check(qaPerms.some((p) => p.effect === "deny" && p.action === "deploy"), "QA Engineer denies deploy");
+  check(qaPerms.some((p) => p.effect === "deny" && p.action === "credential_retrieval"), "QA Engineer denies credential_retrieval");
+  check(qaPerms.every((p) => !(p.effect === "allow" && p.action === "edit")), "QA Engineer does NOT have edit permission (no source modifications)");
+
+  // 29. Unauthorized specialist shell operations are denied
+  const unauthenticatedAgents = ["researcher", "planner", "reviewer"];
+  for (const name of unauthenticatedAgents) {
+    const agentPerms = (opencodeAgents[name] && opencodeAgents[name].permissions) || [];
+    check(agentPerms.some((p) => p.effect === "deny" && p.action === "shell"), `Agent '${name}' denies shell`);
+    check(agentPerms.some((p) => p.effect === "deny" && p.action === "edit"), `Agent '${name}' denies edit`);
+  }
+
+  // 30. No agent has external_directory access
   for (const name of expectedAgents) {
     const agentPerms = (opencodeAgents[name] && opencodeAgents[name].permissions) || [];
     const externalDeny = agentPerms.filter((p) => p.action === "external_directory" && p.effect === "deny");
     check(externalDeny.length > 0, `Agent '${name}' denies external_directory access`);
   }
 
-  // 29. No agent can read .env* files
+  // 31. No agent can read .env* files
   for (const name of expectedAgents) {
     const agentPerms = (opencodeAgents[name] && opencodeAgents[name].permissions) || [];
     const envDeny = agentPerms.filter((p) => p.resource === "*.env*" && p.effect === "deny");
     check(envDeny.length > 0, `Agent '${name}' denies .env* file reads`);
   }
 
-  // 30. Orchestrator mode is primary, all others are subagent
+  // 32. Orchestrator mode is primary, all others are subagent
   check(opencodeAgents.orchestrator && opencodeAgents.orchestrator.mode === "primary", "Orchestrator mode is primary");
   for (const name of ["researcher", "planner", "developer", "qa-engineer", "reviewer", "reporter"]) {
     check(opencodeAgents[name] && opencodeAgents[name].mode === "subagent", `Agent '${name}' mode is subagent`);
   }
 
-  // 31. Dependency-aware orchestration: orchestrator spec mentions dependency tracking and invocation recording
+  // 33. Dependency-aware orchestration: orchestrator spec mentions dependency tracking and invocation recording
   const orchestratorSpec = readFile("agents/orchestrator.md");
   check(/dependenc/i.test(orchestratorSpec), "Orchestrator spec mentions dependency tracking");
   check(/invocation/i.test(orchestratorSpec), "Orchestrator spec mentions invocation recording");
   check(/failed handoff/i.test(orchestratorSpec), "Orchestrator spec mentions failed handoff recording");
 
-  // 32. Reporter spec: restricted edit path, no shell, no autonomous operations
+  // 34. Reporter spec: restricted edit path, no shell, no autonomous operations
   const reporterSpec = readFile("agents/reporter.md");
   check(/reports\//.test(reporterSpec), "Reporter spec references reports/ directory");
   check(/no autonomous/i.test(reporterSpec), "Reporter spec restricts autonomous operations");
   check(/shell/.test(reporterSpec), "Reporter spec addresses shell restrictions");
 
-  // 33. QA Engineer spec: shell permission, no source edits
+  // 35. QA Engineer spec: shell permission, no source edits
   const qaSpec = readFile("agents/qa-engineer.md");
   check(/shell/.test(qaSpec), "QA Engineer spec addresses shell permissions");
   check(/no direct application source/i.test(qaSpec), "QA Engineer spec restricts direct source modification");
 
-  // 34. Developer spec: edit permission, credential denial, approval-gated shell
+  // 36. Developer spec: edit permission, credential denial, approval-gated shell
   const developerSpec = readFile("agents/developer.md");
   check(/edit/.test(developerSpec), "Developer spec references edit operations");
   check(/credential/i.test(developerSpec), "Developer spec addresses credential restrictions");
   check(/per-command/.test(developerSpec) || /per.command/.test(developerSpec), "Developer spec mentions per-command shell approval");
 
-  // 35. Repository isolation: no Scholars directory in workbench root
+  // 37. Repository isolation: no Scholars directory in workbench root
   check(!checkDir("Scholars"), "No Scholars directory in workbench root");
   check(!checkDir("Scholars-Resource-Centre"), "No Scholars-Resource-Centre directory in workbench root");
 
-  // 36. Cross-platform path handling: validator uses node:path
-  check(/require\("node:path"\)/.test(readFile("tests/validate.js")) || /require\("path"\)/.test(readFile("tests/validate.js")), "Validator uses node:path for cross-platform path handling");
+  // 38. Cross-platform path handling: validator uses node:path
+  const validatorContent = readFile("tests/validate.js");
+  check(/path\.(join|resolve|sep|relative)/.test(validatorContent), "Validator uses node:path APIs for cross-platform path handling");
 
-  // 37. Reports directory exists
+  // 39. Reports directory exists
   check(checkDir("reports"), "reports/ directory exists");
 
-  // 38. Task 004.2 boundary acknowledged
+  // 40. Task 004 boundary acknowledged
   check("task_004" in boundaries || "task_004.1" in boundaries || "task_004.2" in boundaries, "Task 004 boundary declared in workbench-manifest.json");
 
-  // 39. Mandatory reporting: workflows reference Reporter and reports/TASK-ID
+  // 41. Mandatory reporting: workflows reference Reporter and reports/TASK-ID
   for (const wf of expectedWorkflows) {
     const content = readFile(`workflows/${wf}/README.md`);
     check(/Reporter/.test(content), `Workflow '${wf}' references Reporter`);
     check(/reports\/TASK-ID/.test(content), `Workflow '${wf}' references reports/TASK-ID report path`);
   }
 
-  // 40. GitHub Actions workflow exists and is configured correctly
+  // 42. GitHub Actions workflow exists and is configured correctly
   check(checkFile(".github/workflows/validation.yml"), "GitHub Actions validation workflow exists");
   const ciContent = readFile(".github/workflows/validation.yml");
   check(ciContent.includes("runs-on: ${{ matrix.os }}") || ciContent.includes("runs-on: ubuntu-latest") || ciContent.includes("runs-on: windows-latest"), "GitHub Actions specifies runner OS");
@@ -504,9 +511,7 @@ check(!/requires additional approval for publication/i.test(agentsMd), "AGENTS.m
   check(ciContent.includes("main"), "GitHub Actions includes main branch targeting");
   check(ciContent.includes("contents: read"), "GitHub Actions uses least-privilege permissions");
 
-  // 41. No hardcoded passing assertions in validator
-  const validatorContent = readFile("tests/validate.js");
-  // 41. Validator does not contain hardcoded passing assertions outside try/catch JSON validation
+  // 43. No hardcoded passing assertions outside JSON validation
   const hardcodedPasses = validatorContent.match(/check\(true,/g) || [];
   const jsonValidationPasses = (validatorContent.match(/check\(true, "[^"]*(?:JSON|json)[^"]*"/g) || []).length;
   check(hardcodedPasses.length <= jsonValidationPasses, "Validator has no hardcoded passing assertions outside JSON validation");
@@ -522,7 +527,7 @@ check(!/requires additional approval for publication/i.test(agentsMd), "AGENTS.m
     }
   }
   if (ERRORS.length > 0) {
-    console.log("FAILED — errors above must be resolved before Task 004.2 is considered complete.");
+    console.log("FAILED — errors above must be resolved before Task 004.3 is considered complete.");
     return 1;
   }
   console.log("PASSED — all validation checks passed.");
