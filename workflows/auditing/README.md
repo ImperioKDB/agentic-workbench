@@ -27,6 +27,10 @@ QA Engineer
     ↓
 Independent Reviewer
     ↓
+Orchestrator (consolidate execution evidence, record actual invocations)
+    ↓
+Reporter (produce execution report)
+    ↓
 Audit report
     ↓
 Human review
@@ -72,7 +76,7 @@ If remediation is approved, follow the Developer → QA Engineer → Independent
 
 ### 8. Audit report
 
-The orchestrator compiles an audit report summarizing findings, evidence, remediation actions (if any), and outstanding items.
+The orchestrator compiles execution evidence, records actual subagent invocations and handoff results, and delegates report production to the Reporter. The Reporter produces a structured Markdown audit report summarizing findings, evidence, remediation actions (if any), and outstanding items, stored under `reports/TASK-ID-descriptive-title.md`. The mandatory reporting protocol applies: every substantive task must conclude with a Markdown execution report.
 
 ### 9. Remediation tracking to closure
 

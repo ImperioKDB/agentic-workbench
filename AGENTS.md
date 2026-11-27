@@ -4,7 +4,7 @@ This file provides operating instructions for OpenCode agents and human operator
 
 ## Scope
 
-This repository is an independent, private OpenCode-native agentic orchestration foundation. It does not modify `ImperioKDB/Scholars`, `ImperioKDB/Scholars-Resource-Centre`, or `ImperioKDB/Updates`.
+This repository is an independent, public OpenCode-native agentic orchestration foundation. It does not modify `ImperioKDB/Scholars`, `ImperioKDB/Scholars-Resource-Centre`, or `ImperioKDB/Updates`.
 
 ## Agents
 
@@ -33,6 +33,59 @@ Six workflows are implemented in `workflows/`:
 
 Every development workflow follows:
 User request → Orchestrator → Researcher (when needed) → Planner → User approval → Developer → QA Engineer → Independent Reviewer → Execution report → Pull request → Human review and merge → Deployment only when separately authorized.
+
+## Mandatory Reporting Protocol
+
+Every substantive task must conclude with a Markdown execution report containing:
+- Task ID and title
+- Objective and scope
+- Repository and branch
+- Starting and ending commit references, where applicable
+- Participating agents
+- Actual delegation and handoff evidence
+- Files inspected
+- Files created or modified
+- Decisions and their justification
+- Implementation summary
+- Tests performed and actual results
+- Security and regression findings
+- Unresolved issues
+- Limitations and blockers
+- Outstanding human approvals
+- Recommended next steps
+- Final completion verdict
+
+For Workbench assignments, store reports at `reports/TASK-ID-descriptive-title.md`.
+Unless explicitly restricted by the user, authorization to implement a substantive task includes authorization to publish its sanitized report and approved changes to the designated feature branch. This does not authorize direct pushes to main, merges, deployments, production changes, or unrelated repository writes.
+
+Every completed assignment must:
+1. Create the report.
+2. Verify its contents.
+3. Commit only authorized files.
+4. Push to the designated branch.
+5. Independently verify the remote commit.
+6. Provide the full commit SHA.
+7. Provide the direct GitHub commit URL.
+8. Provide the direct GitHub report URL.
+
+Reporter produces the report. Git publication must occur through a narrowly authorized human-controlled operation or a properly restricted mechanism.
+
+Do not require the user to repeat publication approval when that authorization is already explicitly included in the task.
+
+Never claim completion when required publication is incomplete.
+
+If publication is blocked, retain the local report and report the exact blocker.
+
+## Dependency-Aware Orchestration
+
+- Independent tasks may run concurrently.
+- Dependent tasks must not start until required outputs are actually received.
+- Planner must receive Researcher findings where research is required.
+- Developer must receive an approved implementation plan.
+- QA must receive implementation evidence and acceptance criteria.
+- Reviewer must receive the implementation and QA evidence.
+- Reporter must receive the final execution evidence.
+- Orchestrator must record actual subagent invocations and failed handoffs. Specialist responses must not be simulated.
 
 ## Human approval requirements
 
@@ -70,6 +123,10 @@ The following operations require explicit human approval before execution:
 
 Task 003 (multi-agent orchestration foundation implementation) is complete. The repository's initial foundation has been created, committed, pushed, and remotely verified. Agent specifications, workflow definitions, project configurations, documentation, testing, and reporting are implemented.
 
-Task 004 (runtime hardening and persistent reporting) is in progress. Seven agents are implemented. Native OpenCode V2 integration, dependency-aware orchestration, least-privilege permissions, expanded secret scanning, mandatory reporting, and documentation reconciliation are implemented or in progress.
+## Task 004 boundary
+
+Task 004 (runtime hardening and persistent reporting) is complete. Seven agents are implemented. Native OpenCode V2 integration, dependency-aware orchestration, least-privilege permissions, expanded secret scanning, mandatory reporting, and documentation reconciliation are implemented.
+
+Task 004.1 (audit remediation) is in progress. Correcting native OpenCode V2 permissions (edit/shell/actions), repairing the validator as a dependency-free Node.js script, establishing mandatory persistent reporting, correcting orchestration sequencing, and adding automated verification via GitHub Actions.
 
 Do not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` without explicit human approval.

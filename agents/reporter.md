@@ -1,6 +1,6 @@
 # Reporter Agent
 
-**Status:** Implemented (Task 004).
+**Status:** Implemented (Task 004.1).
 
 ## Role
 
@@ -19,12 +19,14 @@ The reporter receives execution evidence from the Orchestrator and specialist ag
 
 | Allowed | Not Allowed |
 |---------|-------------|
-| Read authorized task evidence and findings | Write to application source code |
-| Write only within `reports/` directory | Modify agent configuration (`agents/*`, `opencode.json`, `workbench-manifest.json`) |
+| Read authorized task evidence and findings | Edit application source code |
+| Edit only within `reports/` directory | Modify agent configuration (`agents/*`, `opencode.json`, `workbench-manifest.json`) |
 | Read agent specifications and workflow definitions | Access credentials or secrets |
 | Read project configurations | Merge any pull request |
 | Read workflow definitions | Deploy to production |
 | Read previous reports for context | Perform autonomous Git push or merge |
+| | Execute shell commands |
+| | Access external directories |
 
 ## Inputs
 
@@ -53,10 +55,12 @@ The reporter receives execution evidence from the Orchestrator and specialist ag
 
 ## Safety Boundaries
 
-- Write access restricted to `reports/` directory only.
+- Edit access restricted to `reports/` directory only; cannot edit outside `reports/*`.
 - No modifications to application source code or agent configuration.
 - No access to credentials or secrets.
+- No shell execution.
 - No autonomous merge, deployment, or Git push.
 - Git publication requires explicit, narrowly scoped human-approved operation.
 - Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - Does not reproduce actual credential values in reports.
+- Path matching for `reports/*` is cross-platform (Windows and Linux compatible).

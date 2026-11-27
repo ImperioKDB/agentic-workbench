@@ -25,7 +25,9 @@ QA Engineer
     ↓
 Independent Reviewer
     ↓
-Execution report
+Orchestrator (consolidate execution evidence, record actual invocations)
+    ↓
+Reporter (produce execution report)
     ↓
 Pull request
     ↓
@@ -82,7 +84,11 @@ The reviewer inspects the fix for correctness, security, and completeness.
 
 ### 9. Execution report through human merge and deployment
 
-Follows the same execution report, pull request, human review and merge, and deployment authorization steps as the Development Workflow.
+The orchestrator compiles execution evidence, records actual subagent invocations and handoff results, and delegates report production to the Reporter. The Reporter produces a structured Markdown execution report stored under `reports/TASK-ID-descriptive-title.md`. Follows the same pull request, human review and merge, and deployment authorization steps as the Development Workflow, including the mandatory reporting protocol.
+
+### 10. Mandatory reporting protocol
+
+Every substantive task must conclude with a Markdown execution report. For Workbench assignments, reports are stored at `reports/TASK-ID-descriptive-title.md`. Authorization to implement a substantive task includes authorization to publish its sanitized report and approved changes to the designated feature branch. This does not authorize direct pushes to main, merges, deployments, production changes, or unrelated repository writes.
 
 ## Boundaries
 

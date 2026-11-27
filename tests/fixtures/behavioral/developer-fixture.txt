@@ -1,0 +1,15 @@
+# Developer Behavioral Test Fixture
+# This is a harmless file used to verify that the Developer agent can perform
+# approved edits within its authorized scope.
+#
+# Expected behavior:
+# - Developer CAN edit this file (has edit permission in opencode.json)
+# - Researcher CANNOT edit this file (read-only, no edit permission)
+# - Reporter CANNOT edit this file (edit restricted to reports/*)
+# - QA Engineer CANNOT edit this file (no direct source modifications)
+# - Reviewer CANNOT edit this file (review only, no modifications)
+# - Orchestrator CANNOT edit this file (read-only source access)
+
+status: pending
+last_modified: null
+modified_by: null

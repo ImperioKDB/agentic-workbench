@@ -20,6 +20,9 @@ Orchestrator (incorporate findings into planning)
 Planner (if implementation follows)
     ↓
 Human approval (if implementation follows)
+    ↓
+Reporter (produce research execution report)
+    ↓
 ```
 
 ## Step-by-Step Instructions
@@ -44,7 +47,7 @@ The researcher:
 
 ### 4. Orchestrator
 
-The orchestrator incorporates the research findings into planning or the current task context.
+The orchestrator incorporates the research findings into planning or the current task context, and records actual subagent invocations.
 
 ### 5. Planner (if implementation follows)
 
@@ -53,6 +56,10 @@ If the research leads to implementation, the planner converts findings into an i
 ### 6. Human approval (if implementation follows)
 
 Human approval is required before any implementation based on research findings.
+
+### 7. Reporter (produce research execution report)
+
+The orchestrator delegates report production to the Reporter. The Reporter produces a structured Markdown execution report stored under `reports/TASK-ID-descriptive-title.md`. The mandatory reporting protocol applies: every substantive task must conclude with a Markdown execution report.
 
 ## Boundaries
 

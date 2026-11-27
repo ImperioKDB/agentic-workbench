@@ -1,0 +1,20 @@
+name: Validation
+
+on:
+  push:
+    branches: [chore/opencode-v2-integration]
+  pull_request:
+    branches: [chore/opencode-v2-integration]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Node.js validation
+        run: node tests/validate.js

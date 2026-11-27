@@ -25,7 +25,7 @@ QA Engineer
     ↓
 Independent Reviewer
     ↓
-Orchestrator (consolidate execution evidence)
+Orchestrator (consolidate execution evidence, record actual invocations)
     ↓
 Reporter (produce execution report)
     ↓
@@ -96,17 +96,34 @@ The reviewer independently inspects the changes:
 
 ### 9. Execution report
 
-The orchestrator compiles execution evidence from all participating agents and delegates report production to the Reporter. The Reporter produces a structured Markdown execution report summarizing:
-- What was done and which agents participated
-- What was approved and when
-- Test results and review outcome
-- Delegation and handoff evidence
-- Any outstanding items
-- Files inspected, created, or modified
+The orchestrator compiles execution evidence from all participating agents, records actual subagent invocations and handoff results, and delegates report production to the Reporter. The Reporter produces a structured Markdown execution report summarizing:
+- Task ID and title
+- Objective and scope
+- Repository and branch
+- Starting and ending commit references, where applicable
+- Participating agents
+- Actual delegation and handoff evidence
+- Files inspected
+- Files created or modified
+- Decisions and their justification
+- Implementation summary
+- Tests performed and actual results
+- Security and regression findings
+- Unresolved issues
+- Limitations and blockers
+- Outstanding human approvals
+- Recommended next steps
+- Final completion verdict
+
+The report is stored under `reports/TASK-ID-descriptive-title.md`.
 
 ### 10. Reporter publication preparation
 
-The Reporter prepares the execution report for authorized GitHub publication. The report is stored under `reports/TASK-ID-descriptive-title.md`. Publication to the designated reporting branch requires explicit human authorization; no agent may publish autonomously.
+The Reporter prepares the execution report for authorized GitHub publication. Publication to the designated reporting branch requires explicit human authorization; no agent may publish autonomously.
+
+### 11. Mandatory reporting protocol
+
+Every substantive task must conclude with a Markdown execution report. For Workbench assignments, reports are stored at `reports/TASK-ID-descriptive-title.md`. Authorization to implement a substantive task includes authorization to publish its sanitized report and approved changes to the designated feature branch. This does not authorize direct pushes to main, merges, deployments, production changes, or unrelated repository writes.
 
 ### 11. Pull request
 

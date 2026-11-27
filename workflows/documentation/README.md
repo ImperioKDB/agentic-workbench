@@ -21,6 +21,10 @@ Human approval
     ↓
 Merge
     ↓
+Orchestrator (consolidate execution evidence, record actual invocations)
+    ↓
+Reporter (produce execution report)
+    ↓
 Publication (separately authorized)
 ```
 
@@ -48,7 +52,7 @@ Human approval is required before documentation is merged.
 
 ### 6. Merge through publication
 
-Follows the pull request, human review and merge, and publication authorization steps from the Development Workflow.
+Follows the pull request, human review and merge, and publication authorization steps from the Development Workflow. The orchestrator delegates report production to the Reporter, which produces a structured Markdown execution report stored under `reports/TASK-ID-descriptive-title.md`. The mandatory reporting protocol applies: every substantive task must conclude with a Markdown execution report.
 
 ## Boundaries
 

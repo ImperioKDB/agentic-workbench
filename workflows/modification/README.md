@@ -25,7 +25,9 @@ QA Engineer
     ↓
 Independent Reviewer
     ↓
-Execution report
+Orchestrator (consolidate execution evidence, record actual invocations)
+    ↓
+Reporter (produce execution report)
     ↓
 Pull request
     ↓
@@ -66,7 +68,7 @@ The orchestrator submits the plan for human approval. No modification proceeds u
 
 ### 6. Developer through human merge and deployment
 
-Follows the Developer → QA Engineer → Independent Reviewer → Execution report → Pull request → Human review and merge → Deployment authorization steps from the Development Workflow.
+Follows the Developer → QA Engineer → Independent Reviewer → Execution report → Pull request → Human review and merge → Deployment authorization steps from the Development Workflow, including the mandatory reporting protocol and Reporter-produced execution report stored under `reports/TASK-ID-descriptive-title.md`.
 
 ## Boundaries
 
