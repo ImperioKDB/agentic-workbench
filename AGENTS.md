@@ -115,9 +115,76 @@ The following operations require explicit human approval before execution:
 - `agents/` — OpenCode agent specifications (implemented).
 - `skills/` — OpenCode skills directory (no skills installed).
 - `workflows/*/` — Workflow definitions (implemented).
-- `projects/*/` — Project-specific configurations (implemented; descriptive only).
+- `projects/*/` — Project-specific configurations and templates (implemented; descriptive only).
+- `projects/project-context-template.json` — Template for project-scoped Workbench integration context.
 - `reports/` — Task execution and verification reports.
 - `docs/` — Architecture, security, and roadmap documentation (implemented).
+- `scripts/` — Reusable scripts, including the Workbench adapter.
+
+## Project-Scoped Workbench Integration
+
+The Workbench supports project-scoped integration: a target project directory can be configured with
+its own project-level `.opencode.json` that registers the seven Workbench agents (orchestrator,
+researcher, planner, developer, qa-engineer, reviewer, reporter) using `system: {file:<ABS>/agents/<name>.md}`.
+Each agent spec is authored in the Workbench repository (`agents/`) and referenced by absolute path from
+the generated project config. The orchestrator runs in `primary` mode; all specialists run in `subagent` mode.
+
+### Adapter script (`scripts/workbench-adapter.js`)
+
+The adapter generates a project-scoped `.opencode.json` for a target project directory.
+
+Usage:
+```
+node scripts/workbench-adapter.js <target> [--workbench-root <root>] [--dry-run] [--rollback] [--force]
+```
+
+- `<target>` — Target project directory to configure.
+- `--workbench-root <root>` — Path to the Workbench repository root (default: parent of this script).
+- `--dry-run` — Print planned actions; write nothing.
+- `--rollback` — Restore the prior config from the most recent timestamped backup.
+- `--force` — Overwrite an existing `<target>/.opencode.json`.
+
+Behavior:
+- Validates the Workbench root contains all seven agent files.
+- Validates each agent path canonicalizes and is contained within `--workbench-root/agents/`.
+- Detects an existing `<target>/.opencode.json`; refuses to overwrite unless `--force` is given.
+- Idempotent: re-running without `--force` detects the existing config and exits cleanly.
+- Backs up any pre-existing config to `<target>/.workbench-backups/<timestamp>/` with a SHA-256 manifest.
+- Writes to a temp file then renames for atomicity.
+- Rollback restores the prior config byte-for-byte and validates the hash before restore.
+- Zero npm dependencies (Node built-ins only).
+- Preserves the deny-* baseline; ask rules for Developer/QA shell/edit; Reporter edit restricted to `reports/*`.
+- No credentials, no provider settings, no machine-specific paths committed to the app repo.
+
+### Project-context template (`projects/project-context-template.json`)
+
+A project deploying the Workbench uses `projects/project-context-template.json` to capture its
+project-specific context. It contains nine fields:
+
+1. `identity` — Project name and short description.
+2. `tech_stack` — Primary languages, frameworks, libraries, and tooling versions.
+3. `architectural_constraints` — Architectural patterns, module boundaries, layering rules, integration points.
+4. `dev_test_commands` — Local development, lint, type-check, test, and build commands.
+5. `production_safety_boundaries` — Deployment restrictions, production access rules, rollback procedures.
+6. `approved_file_modification_scope` — Directories and file patterns the agent may modify.
+7. `existing_skills` — Skills already installed or available to the project.
+8. `reporting_destination` — Where execution reports are stored for this project.
+9. `human_approval_requirements` — Operations requiring explicit human approval.
+
+Each field contains descriptive placeholder text; the file is valid JSON and is descriptive only
+(it does not confer write access or modify any project).
+
+### Separation of instruction scopes
+
+Agent specifications separate instructions into four scopes:
+
+- **Universal Responsibilities** — The agent's core role, independent of deployment context.
+- **Workbench-Specific Restrictions** — Restrictions that apply only when operating in the Workbench repository.
+- **Project-Specific Restrictions** — Restrictions that apply when the agent is deployed to a project context.
+- **Explicit Human Authorization** — Operations requiring explicit human approval before execution.
+
+This separation keeps agent behavior consistent across contexts while making context-specific boundaries
+explicit and auditable.
 
 ## Task 003 boundary
 

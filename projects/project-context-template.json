@@ -1,0 +1,11 @@
+{
+  "identity": "Placeholder: project name and short description (e.g., 'Scholars - AI-powered research library frontend').",
+  "tech_stack": "Placeholder: primary languages, frameworks, libraries, and tooling versions used by the project.",
+  "architectural_constraints": "Placeholder: architectural patterns, module boundaries, layering rules, and integration points the project must respect.",
+  "dev_test_commands": "Placeholder: commands for local development, linting, type-checking, testing, and building (e.g., 'npm test', 'node tests/validate.js').",
+  "production_safety_boundaries": "Placeholder: deployment restrictions, production access rules, environment-specific safety constraints, and rollback procedures.",
+  "approved_file_modification_scope": "Placeholder: directories and file patterns the agent is authorized to modify within this project context.",
+  "existing_skills": "Placeholder: skills already installed or available to the project (OpenCode skills directory, custom tools, templates).",
+  "reporting_destination": "Placeholder: where execution reports are stored for this project (e.g., 'reports/' or a dedicated reporting branch/repo).",
+  "human_approval_requirements": "Placeholder: operations requiring explicit human approval before execution (e.g., production changes, PR merges, credential rotation, repository writes)."
+}

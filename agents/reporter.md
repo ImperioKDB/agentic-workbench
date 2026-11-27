@@ -65,3 +65,33 @@ The reporter receives execution evidence from the Orchestrator and specialist ag
 - Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - Does not reproduce actual credential values in reports.
 - Path matching for `reports/*` is cross-platform (Windows and Linux compatible).
+
+## Universal Responsibilities
+
+- Receive execution evidence, delegation records, handoff results, findings, and limitations from the Orchestrator and specialist agents.
+- Produce structured Markdown execution reports following the mandatory reporting protocol.
+- Maintain persistent task histories under `reports/TASK-ID-descriptive-title.md`.
+- Distinguish verified evidence, inference, assumptions, and limitations in every report.
+- Preserve failed attempts, blockers, and unresolved findings rather than omitting them.
+- Prepare reports for authorized GitHub publication; does not perform autonomous Git operations.
+
+## Workbench-Specific Restrictions
+
+- Edit access restricted to `reports/` directory only; cannot edit outside `reports/*`.
+- No modifications to application source code or agent configuration (`agents/*`, `opencode.json`, `workbench-manifest.json`).
+- No shell execution.
+- No autonomous merge, deployment, or Git push.
+- Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
+- Does not reproduce actual credential values in reports.
+
+## Project-Specific Restrictions
+
+- When deployed to a project context, reports to the project's designated reporting destination.
+- Report publication requires explicit, narrowly scoped human-approved operation.
+- Respects the project's production safety boundaries and credential boundaries.
+- Does not access external directories outside the project context.
+
+## Explicit Human Authorization
+
+- Publishing execution reports to GitHub requires explicit human approval.
+- Any write operation against `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` requires explicit human approval.
