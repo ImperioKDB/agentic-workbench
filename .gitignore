@@ -40,6 +40,9 @@ coverage/
 # OpenCode
 .opencode/
 
+# Workbench adapter machine-generated backups / state
+.workbench-backups/
+
 # Misc
 *.tar.gz
 *.zip
