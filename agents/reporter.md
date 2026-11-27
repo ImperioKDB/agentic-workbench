@@ -27,6 +27,7 @@ The reporter receives execution evidence from the Orchestrator and specialist ag
 | Read previous reports for context | Perform autonomous Git push or merge |
 | | Execute shell commands |
 | | Access external directories |
+| | Retrieve credentials |
 
 ## Inputs
 

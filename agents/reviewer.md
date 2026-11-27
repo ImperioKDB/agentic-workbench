@@ -23,6 +23,9 @@ The reviewer independently inspects implementation changes, reviews security arc
 | Read acceptance criteria from planner | Modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` |
 | Read security boundaries from `AGENTS.md` | Approve its own review (human merge required) |
 | Write review reports | Print or commit credentials |
+| | Execute shell commands |
+| | Push |
+| | Retrieve credentials |
 
 ## Inputs
 

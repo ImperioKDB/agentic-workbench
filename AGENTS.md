@@ -127,6 +127,8 @@ Task 003 (multi-agent orchestration foundation implementation) is complete. The 
 
 Task 004 (runtime hardening and persistent reporting) is complete. Seven agents are implemented. Native OpenCode V2 integration, dependency-aware orchestration, least-privilege permissions, expanded secret scanning, mandatory reporting, and documentation reconciliation are implemented.
 
-Task 004.1 (audit remediation) is in progress. Correcting native OpenCode V2 permissions (edit/shell/actions), repairing the validator as a dependency-free Node.js script, establishing mandatory persistent reporting, correcting orchestration sequencing, and adding automated verification via GitHub Actions.
+Task 004.1 (audit remediation) is complete. Native OpenCode V2 permissions corrected (edit/shell/actions), validator repaired as dependency-free Node.js script, mandatory persistent reporting established, orchestration sequencing corrected, automated verification via GitHub Actions added.
+
+Task 004.2 (final security and runtime readiness corrections) is in progress. Correcting unrestricted shell permissions (approval-gated with last-match precedence), repairing secret scanning with git ls-files -z inventory, strengthening validation with rule precedence testing, reconciling reporting instructions, and preparing runtime readiness documentation.
 
 Do not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` without explicit human approval.

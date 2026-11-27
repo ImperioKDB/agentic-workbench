@@ -4,17 +4,25 @@ on:
   push:
     branches: [chore/opencode-v2-integration]
   pull_request:
-    branches: [chore/opencode-v2-integration]
+    branches: [chore/opencode-v2-integration, main]
 
 permissions:
   contents: read
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Run Node.js validation
         run: node tests/validate.js

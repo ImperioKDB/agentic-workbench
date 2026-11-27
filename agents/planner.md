@@ -23,6 +23,9 @@ The planner converts requirements into implementation plans. It identifies affec
 | Read workflow definitions in `workflows/` | Create branches or commits |
 | Read agent specifications in `agents/` | Deploy to production |
 | Read research reports from researcher | Merge any pull request |
+| | Execute shell commands |
+| | Push or deploy |
+| | Retrieve credentials |
 
 ## Inputs
 

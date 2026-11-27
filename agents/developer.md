@@ -25,6 +25,7 @@ The developer implements approved changes following project conventions. It crea
 | Read project configurations in `projects/` | Modify files outside the approved plan scope |
 | Read workflow definitions in `workflows/` | Print or commit credentials |
 | Read agent specifications in `agents/` | Access external directories |
+| | Execute arbitrary shell commands (requires per-command approval) |
 
 ## Inputs
 
@@ -54,4 +55,5 @@ The developer implements approved changes following project conventions. It crea
 - No access to external directories.
 - Human approval required for production changes.
 - Does not merge or deploy.
-- Shell access limited to approved development operations; requires human approval for consequential commands.
+- Shell access limited to specifically justified, harmless commands only (`node tests/validate.js`, `npm test`, `git status`, `git diff`); arbitrary shell execution requires per-command human approval.
+- One-time approvals required for each shell command; no permanent blanket approvals.

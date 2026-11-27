@@ -63,8 +63,10 @@
     "default_branch": "main"
   },
   "boundaries": {
-    "task_003": "in_progress",
-    "task_004": "in_progress",
+    "task_003": "complete",
+    "task_004": "complete",
+    "task_004.1": "complete",
+    "task_004.2": "in_progress",
     "do_not_modify": [
       "ImperioKDB/Scholars",
       "ImperioKDB/Scholars-Resource-Centre"

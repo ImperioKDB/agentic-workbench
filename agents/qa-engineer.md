@@ -26,6 +26,7 @@ The QA engineer runs relevant tests, validates expected behaviour, detects regre
 | Write test evidence reports | Print or commit credentials |
 | Read project configurations in `projects/` | Access external directories |
 | Read workflow definitions in `workflows/` | Edit credential files (`*.env*`, `credentials.json`, `*.secret*`) |
+| | Execute arbitrary shell commands (requires per-command approval) |
 
 ## Inputs
 
@@ -50,7 +51,8 @@ The QA engineer runs relevant tests, validates expected behaviour, detects regre
 
 ## Safety Boundaries
 
-- Shell access limited to approved test, lint, type-check, and build commands; requires human approval for consequential commands.
+- Shell access limited to specifically justified, harmless commands only (`node tests/validate.js`, `npm test`); arbitrary shell execution requires per-command human approval.
+- One-time approvals required for each shell command; no permanent blanket approvals.
 - No direct application source code modifications.
 - No production-connected testing without separate authorization.
 - Reports defects; does not approve releases.

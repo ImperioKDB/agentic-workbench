@@ -29,7 +29,10 @@
                 { "effect": "allow", "resource": "*", "action": "glob" },
                 { "effect": "allow", "resource": "*", "action": "grep" },
                 { "effect": "deny", "resource": "*.env*", "action": "read" },
-                { "effect": "deny", "resource": "*", "action": "external_directory" }
+                { "effect": "deny", "resource": "*", "action": "external_directory" },
+                { "effect": "deny", "resource": "*", "action": "edit" },
+                { "effect": "deny", "resource": "*", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "subagent" }
             ],
             "mode": "subagent",
             "system": "{file:agents/researcher.md}"
@@ -42,7 +45,10 @@
                 { "effect": "allow", "resource": "*", "action": "glob" },
                 { "effect": "allow", "resource": "*", "action": "grep" },
                 { "effect": "deny", "resource": "*.env*", "action": "read" },
-                { "effect": "deny", "resource": "*", "action": "external_directory" }
+                { "effect": "deny", "resource": "*", "action": "external_directory" },
+                { "effect": "deny", "resource": "*", "action": "edit" },
+                { "effect": "deny", "resource": "*", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "subagent" }
             ],
             "mode": "subagent",
             "system": "{file:agents/planner.md}"
@@ -56,11 +62,20 @@
                 { "effect": "allow", "resource": "*", "action": "grep" },
                 { "effect": "deny", "resource": "*.env*", "action": "read" },
                 { "effect": "deny", "resource": "*", "action": "external_directory" },
+                { "effect": "deny", "resource": "*", "action": "edit" },
                 { "effect": "allow", "resource": "*", "action": "edit" },
                 { "effect": "deny", "resource": "*.env*", "action": "edit" },
                 { "effect": "deny", "resource": "credentials.json", "action": "edit" },
                 { "effect": "deny", "resource": "*.secret*", "action": "edit" },
-                { "effect": "allow", "resource": "*", "action": "shell" }
+                { "effect": "deny", "resource": "*", "action": "shell" },
+                { "effect": "allow", "resource": "node tests/validate.js", "action": "shell" },
+                { "effect": "allow", "resource": "npm test", "action": "shell" },
+                { "effect": "allow", "resource": "git status", "action": "shell" },
+                { "effect": "allow", "resource": "git diff", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "merge" },
+                { "effect": "deny", "resource": "*", "action": "push" },
+                { "effect": "deny", "resource": "*", "action": "deploy" },
+                { "effect": "deny", "resource": "*", "action": "credential_retrieval" }
             ],
             "mode": "subagent",
             "system": "{file:agents/developer.md}"
@@ -74,10 +89,17 @@
                 { "effect": "allow", "resource": "*", "action": "grep" },
                 { "effect": "deny", "resource": "*.env*", "action": "read" },
                 { "effect": "deny", "resource": "*", "action": "external_directory" },
-                { "effect": "allow", "resource": "*", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "edit" },
                 { "effect": "deny", "resource": "*.env*", "action": "edit" },
                 { "effect": "deny", "resource": "credentials.json", "action": "edit" },
-                { "effect": "deny", "resource": "*.secret*", "action": "edit" }
+                { "effect": "deny", "resource": "*.secret*", "action": "edit" },
+                { "effect": "deny", "resource": "*", "action": "shell" },
+                { "effect": "allow", "resource": "node tests/validate.js", "action": "shell" },
+                { "effect": "allow", "resource": "npm test", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "merge" },
+                { "effect": "deny", "resource": "*", "action": "push" },
+                { "effect": "deny", "resource": "*", "action": "deploy" },
+                { "effect": "deny", "resource": "*", "action": "credential_retrieval" }
             ],
             "mode": "subagent",
             "system": "{file:agents/qa-engineer.md}"
@@ -90,7 +112,14 @@
                 { "effect": "allow", "resource": "*", "action": "glob" },
                 { "effect": "allow", "resource": "*", "action": "grep" },
                 { "effect": "deny", "resource": "*.env*", "action": "read" },
-                { "effect": "deny", "resource": "*", "action": "external_directory" }
+                { "effect": "deny", "resource": "*", "action": "external_directory" },
+                { "effect": "deny", "resource": "*", "action": "edit" },
+                { "effect": "deny", "resource": "*", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "subagent" },
+                { "effect": "deny", "resource": "*", "action": "merge" },
+                { "effect": "deny", "resource": "*", "action": "push" },
+                { "effect": "deny", "resource": "*", "action": "deploy" },
+                { "effect": "deny", "resource": "*", "action": "credential_retrieval" }
             ],
             "mode": "subagent",
             "system": "{file:agents/reviewer.md}"
@@ -102,9 +131,16 @@
                 { "effect": "allow", "resource": "*", "action": "read" },
                 { "effect": "allow", "resource": "*", "action": "glob" },
                 { "effect": "allow", "resource": "*", "action": "grep" },
-                { "effect": "allow", "resource": "reports/*", "action": "edit" },
                 { "effect": "deny", "resource": "*.env*", "action": "read" },
-                { "effect": "deny", "resource": "*", "action": "external_directory" }
+                { "effect": "deny", "resource": "*", "action": "external_directory" },
+                { "effect": "deny", "resource": "*", "action": "edit" },
+                { "effect": "allow", "resource": "reports/*", "action": "edit" },
+                { "effect": "deny", "resource": "*", "action": "shell" },
+                { "effect": "deny", "resource": "*", "action": "subagent" },
+                { "effect": "deny", "resource": "*", "action": "merge" },
+                { "effect": "deny", "resource": "*", "action": "push" },
+                { "effect": "deny", "resource": "*", "action": "deploy" },
+                { "effect": "deny", "resource": "*", "action": "credential_retrieval" }
             ],
             "mode": "subagent",
             "system": "{file:agents/reporter.md}"

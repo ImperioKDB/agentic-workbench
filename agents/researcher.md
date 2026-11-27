@@ -23,6 +23,9 @@ The researcher investigates codebases and documentation, researches technical so
 | Read workflow definitions in `workflows/` | Create branches or commits |
 | Read agent specifications in `agents/` | Deploy to production |
 | Read documentation in `docs/` | Print or commit credentials |
+| | Execute shell commands |
+| | Merge, push, or deploy |
+| | Retrieve credentials |
 
 ## Inputs
 
