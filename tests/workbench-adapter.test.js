@@ -25,6 +25,10 @@ const AGENT_NAMES = [
   "reporter",
 ];
 
+const CONFIG_DIR = ".opencode";
+const CONFIG_FILE = "opencode.json";
+const LEGACY_CONFIG_FILE = ".opencode.json";
+
 // --- Test harness -------------------------------------------------------------
 
 let passCount = 0;
@@ -80,11 +84,6 @@ function removeDirRecursive(dir) {
   }
 }
 
-// Wait until the wall-clock millisecond changes so that separately-spawned
-// adapter processes produce distinct timestamp-based backup directory names.
-// The adapter's timestamp() uses ISO milliseconds plus a per-process counter
-// that resets on every spawn, so without this, rapid successive runs can
-// collide on the same backup directory name.
 function waitForNewMillisecond() {
   const start = Date.now();
   while (Date.now() === start) {
@@ -118,6 +117,18 @@ function makeAgentsDir(root) {
   return agentsDir;
 }
 
+// Fixture: minimal valid project context file.
+function makeProjectContext(root, overrides = {}) {
+  const context = {
+    identity: "Test project",
+    dev_test_commands: "node tests/validate.js npm test git status",
+    ...overrides,
+  };
+  const ctxPath = path.join(root, "project-context.json");
+  fs.writeFileSync(ctxPath, JSON.stringify(context, null, 2), "utf8");
+  return ctxPath;
+}
+
 // --- Tests --------------------------------------------------------------------
 
 test("parseArgs: positional target accepted, unknown flags rejected", (dir) => {
@@ -132,6 +143,17 @@ test("parseArgs: positional target accepted, unknown flags rejected", (dir) => {
   assert(!out.combined.includes("Unexpected positional"), "no unexpected-positional error expected");
 });
 
+test("parseArgs: --force is removed and rejected", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const out = runAdapter([target, "--workbench-root", wb, "--force"]);
+  assert(!out.ok, "--force should be rejected");
+  assert(out.combined.includes("removed"), `expected --force removal message; got: ${out.combined}`);
+});
+
 test("parseArgs: --dry-run writes nothing", (dir) => {
   const wb = path.join(dir, "wb");
   makeAgentsDir(wb);
@@ -140,19 +162,9 @@ test("parseArgs: --dry-run writes nothing", (dir) => {
 
   const out = runAdapter([target, "--workbench-root", wb, "--dry-run"]);
   assert(out.ok, `dry-run should succeed; got status ${out.status}: ${out.combined}`);
-  assert(!fs.existsSync(path.join(target, ".opencode.json")), "dry-run must not write config");
+  assert(!fs.existsSync(path.join(target, CONFIG_DIR, CONFIG_FILE)), "dry-run must not write config");
+  assert(!fs.existsSync(path.join(target, LEGACY_CONFIG_FILE)), "dry-run must not write legacy config");
   assert(out.combined.includes("[dry-run]"), "dry-run output should mention dry-run");
-});
-
-test("parseArgs: --workbench-root and --force flags accepted", (dir) => {
-  const wb = path.join(dir, "wb");
-  makeAgentsDir(wb);
-  const target = path.join(dir, "target");
-  fs.mkdirSync(target, { recursive: true });
-
-  const out = runAdapter([target, "--workbench-root", wb, "--force"]);
-  assert(out.ok, `adapter should succeed with --force and --workbench-root; got ${out.status}: ${out.combined}`);
-  assert(fs.existsSync(path.join(target, ".opencode.json")), "config should be generated");
 });
 
 test("parseArgs: missing target argument fails", () => {
@@ -167,15 +179,81 @@ test("parseArgs: nonexistent target directory fails", () => {
   assert(!out.ok, "nonexistent target should fail");
 });
 
-test("canonicalize containment: valid agent path contained", (dir) => {
+test("config filename: directory-based .opencode/opencode.json is generated", (dir) => {
   const wb = path.join(dir, "wb");
   makeAgentsDir(wb);
   const target = path.join(dir, "target");
   fs.mkdirSync(target, { recursive: true });
 
   const out = runAdapter([target, "--workbench-root", wb]);
-  assert(out.ok, `adapter should succeed for valid containment; got ${out.status}: ${out.combined}`);
-  assert(fs.existsSync(path.join(target, ".opencode.json")), "config should be generated");
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
+  assert(fs.existsSync(path.join(target, CONFIG_DIR, CONFIG_FILE)), "directory-based config should be generated");
+  assert(!fs.existsSync(path.join(target, LEGACY_CONFIG_FILE)), "legacy file-based config should NOT be generated");
+});
+
+test("config filename: legacy .opencode.json is detected as existing config", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(target, LEGACY_CONFIG_FILE), "{\"legacy\": true}\n", "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb]);
+  assert(out.ok, "legacy config should be treated as existing (idempotent)");
+  assert(out.combined.includes("idempotent"), `expected idempotent message; got: ${out.combined}`);
+  assert(!fs.existsSync(path.join(target, CONFIG_DIR)), "directory config should not be created when legacy exists");
+});
+
+test("existing configuration conflicts: both forms with different content fail", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(path.join(target, CONFIG_DIR), { recursive: true });
+  fs.writeFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "{\"dir\": true}\n", "utf8");
+  fs.writeFileSync(path.join(target, LEGACY_CONFIG_FILE), "{\"legacy\": true}\n", "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb]);
+  assert(!out.ok, "conflicting configs should fail");
+  assert(out.combined.includes("Conflicting"), `expected conflict message; got: ${out.combined}`);
+  assert(out.combined.includes("Refusing"), `expected refusal message; got: ${out.combined}`);
+});
+
+test("existing configuration conflicts: both forms with same content is idempotent", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(path.join(target, CONFIG_DIR), { recursive: true });
+  const same = "{\"same\": true}\n";
+  fs.writeFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), same, "utf8");
+  fs.writeFileSync(path.join(target, LEGACY_CONFIG_FILE), same, "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb]);
+  assert(out.ok, "identical configs should be idempotent");
+  assert(out.combined.includes("idempotent"), `expected idempotent message; got: ${out.combined}`);
+});
+
+test("idempotency: existing config + no --force leaves file unchanged", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const first = runAdapter([target, "--workbench-root", wb]);
+  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+  const configPath = path.join(target, CONFIG_DIR, CONFIG_FILE);
+  assert(fs.existsSync(configPath), "config should exist after first run");
+  const beforeContent = fs.readFileSync(configPath, "utf8");
+  const beforeMtime = fs.statSync(configPath).mtimeMs;
+
+  const second = runAdapter([target, "--workbench-root", wb]);
+  assert(second.ok, `second idempotent run should succeed; got ${second.status}: ${second.combined}`);
+  assert(second.combined.includes("idempotent"), `expected idempotent message; got: ${second.combined}`);
+  const afterContent = fs.readFileSync(configPath, "utf8");
+  const afterMtime = fs.statSync(configPath).mtimeMs;
+  assertEqual(afterContent, beforeContent, "config content must be unchanged by idempotent run");
+  assertEqual(afterMtime, beforeMtime, "config mtime must be unchanged by idempotent run");
 });
 
 test("canonicalize containment: agent path escaping agents/ is rejected", (dir) => {
@@ -187,7 +265,6 @@ test("canonicalize containment: agent path escaping agents/ is rejected", (dir) 
     fs.writeFileSync(path.join(agentsDir, `${name}.md`), `# ${name}\n`, "utf8");
   }
 
-  // Replace reviewer.md with a symlink pointing outside agents/.
   const escapeTarget = path.join(dir, "escape.md");
   fs.writeFileSync(escapeTarget, "escape\n", "utf8");
   const linkName = path.join(agentsDir, "reviewer.md");
@@ -209,30 +286,13 @@ test("canonicalize containment: agent path escaping agents/ is rejected", (dir) 
   assert(out.combined.includes("escapes agents/ directory"), `expected containment rejection; got: ${out.combined}`);
 });
 
-test("idempotency: existing config + no --force leaves file unchanged", (dir) => {
-  const wb = path.join(dir, "wb");
-  makeAgentsDir(wb);
-  const target = path.join(dir, "target");
-  fs.mkdirSync(target, { recursive: true });
-
-  const first = runAdapter([target, "--workbench-root", wb]);
-  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
-  const configPath = path.join(target, ".opencode.json");
-  assert(fs.existsSync(configPath), "config should exist after first run");
-  const beforeContent = fs.readFileSync(configPath, "utf8");
-  const beforeMtime = fs.statSync(configPath).mtimeMs;
-
-  const second = runAdapter([target, "--workbench-root", wb]);
-  assert(second.ok, `second idempotent run should succeed; got ${second.status}: ${second.combined}`);
-  assert(second.combined.includes("idempotent"), `expected idempotent message; got: ${second.combined}`);
-  assert(fs.existsSync(configPath), "config should still exist");
-  const afterContent = fs.readFileSync(configPath, "utf8");
-  const afterMtime = fs.statSync(configPath).mtimeMs;
-  assertEqual(afterContent, beforeContent, "config content must be unchanged by idempotent run");
-  assertEqual(afterMtime, beforeMtime, "config mtime must be unchanged by idempotent run");
+test("rollback: --rollback requires explicit target", () => {
+  const out = runAdapter(["--rollback"]);
+  assert(!out.ok, "rollback without target should fail");
+  assert(out.combined.includes("requires an explicit"), `expected target requirement; got: ${out.combined}`);
 });
 
-test("idempotency: existing config + --force overwrites", (dir) => {
+test("rollback: restores config byte-for-byte when hash matches", (dir) => {
   const wb = path.join(dir, "wb");
   makeAgentsDir(wb);
   const target = path.join(dir, "target");
@@ -240,16 +300,18 @@ test("idempotency: existing config + --force overwrites", (dir) => {
 
   const first = runAdapter([target, "--workbench-root", wb]);
   assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+  const configPath = path.join(target, CONFIG_DIR, CONFIG_FILE);
+  const original = fs.readFileSync(configPath, "utf8");
 
-  const configPath = path.join(target, ".opencode.json");
+  // Mutate installed config, then rollback must restore the backed-up original.
   fs.writeFileSync(configPath, "MUTATED\n", "utf8");
-
-  const second = runAdapter([target, "--workbench-root", wb, "--force"]);
-  assert(second.ok, `forced run should succeed; got ${second.status}: ${second.combined}`);
-  assert(fs.readFileSync(configPath, "utf8") !== "MUTATED\n", "config should be overwritten by --force");
+  waitForNewMillisecond();
+  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(out.ok, `rollback should succeed; got ${out.status}: ${out.combined}`);
+  assertEqual(fs.readFileSync(configPath, "utf8"), original, "config must be restored byte-for-byte");
 });
 
-test("backup SHA-256 generation: backup dir contains config + matching hash", (dir) => {
+test("rollback: refuses to rollback modified configuration", (dir) => {
   const wb = path.join(dir, "wb");
   makeAgentsDir(wb);
   const target = path.join(dir, "target");
@@ -257,29 +319,32 @@ test("backup SHA-256 generation: backup dir contains config + matching hash", (d
 
   const first = runAdapter([target, "--workbench-root", wb]);
   assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+  const configPath = path.join(target, CONFIG_DIR, CONFIG_FILE);
 
-  const configPath = path.join(target, ".opencode.json");
-  const preBackupContent = '{"existing": true}\n';
-  fs.writeFileSync(configPath, preBackupContent, "utf8");
+  // Modify the installed config after installation.
+  fs.writeFileSync(configPath, "MUTATED-AFTER-INSTALL\n", "utf8");
+  waitForNewMillisecond();
+  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(!out.ok, "rollback should refuse when config modified since installation");
+  assert(out.combined.includes("modified since installation"), `expected refusal; got: ${out.combined}`);
+});
 
-  const second = runAdapter([target, "--workbench-root", wb, "--force"]);
-  assert(second.ok, `forced run should succeed; got ${second.status}: ${second.combined}`);
+test("rollback: refuses to delete unrelated pre-existing configuration", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
 
+  // Create an unrelated config NOT generated by the adapter (no adapter-meta).
   const backupsDir = path.join(target, ".workbench-backups");
-  assert(fs.existsSync(backupsDir) && fs.statSync(backupsDir).isDirectory(), "backups dir not created");
-  const entries = fs
-    .readdirSync(backupsDir)
-    .filter((e) => fs.statSync(path.join(backupsDir, e)).isDirectory());
-  assert(entries.length >= 1, "no backup directory created");
+  const backupDir = path.join(backupsDir, "2026-01-01T00-00-00-000Z-1");
+  fs.mkdirSync(backupDir, { recursive: true });
+  fs.writeFileSync(path.join(backupDir, CONFIG_FILE), "unrelated\n", "utf8");
+  // No adapter-meta.json -> not a verified adapter-generated config.
 
-  const backupDir = path.join(backupsDir, entries[entries.length - 1]);
-  assert(fs.existsSync(path.join(backupDir, ".opencode.json")), "backup config missing");
-  assert(fs.existsSync(path.join(backupDir, ".opencode.json.sha256")), "sha256 manifest missing");
-
-  const backupConfig = fs.readFileSync(path.join(backupDir, ".opencode.json"), "utf8");
-  const manifestHash = fs.readFileSync(path.join(backupDir, ".opencode.json.sha256"), "utf8").trim();
-  assert(/^[0-9a-f]{64}$/.test(manifestHash), `sha256 manifest should be 64-char hex, got: ${manifestHash}`);
-  assertEqual(backupConfig, preBackupContent, "backed-up content must match pre-backup content");
+  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(!out.ok, "rollback should refuse unrelated pre-existing config");
+  assert(out.combined.includes("not a verified adapter-generated"), `expected refusal; got: ${out.combined}`);
 });
 
 test("rollback aborts when hash manifest is missing", (dir) => {
@@ -291,61 +356,12 @@ test("rollback aborts when hash manifest is missing", (dir) => {
   const backupsDir = path.join(target, ".workbench-backups");
   const backupDir = path.join(backupsDir, "2026-01-01T00-00-00-000Z-1");
   fs.mkdirSync(backupDir, { recursive: true });
-  fs.writeFileSync(path.join(backupDir, ".opencode.json"), "stale\n", "utf8");
-  // Intentionally no .opencode.json.sha256.
+  fs.writeFileSync(path.join(backupDir, CONFIG_FILE), "stale\n", "utf8");
+  // No .opencode.json.sha256.
 
   const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
   assert(!out.ok, "rollback should fail when hash manifest is missing");
   assert(out.combined.includes("missing") || out.combined.includes("refusing"), `expected abort message; got: ${out.combined}`);
-});
-
-test("rollback restores config byte-for-byte when hash matches", (dir) => {
-  const wb = path.join(dir, "wb");
-  makeAgentsDir(wb);
-  const target = path.join(dir, "target");
-  fs.mkdirSync(target, { recursive: true });
-
-  const first = runAdapter([target, "--workbench-root", wb]);
-  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
-  const configPath = path.join(target, ".opencode.json");
-  const original = fs.readFileSync(configPath, "utf8");
-
-  // Second run backs up the original, then rewrites (same content).
-  const second = runAdapter([target, "--workbench-root", wb, "--force"]);
-  assert(second.ok, `second run should succeed; got ${second.status}: ${second.combined}`);
-
-  // Mutate config, then rollback must restore the backed-up original.
-  fs.writeFileSync(configPath, "MUTATED\n", "utf8");
-  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
-  assert(out.ok, `rollback should succeed; got ${out.status}: ${out.combined}`);
-  assertEqual(fs.readFileSync(configPath, "utf8"), original, "config must be restored byte-for-byte");
-});
-
-test("timestamp uniqueness: successive runs create distinct backup dirs", (dir) => {
-  const wb = path.join(dir, "wb");
-  makeAgentsDir(wb);
-  const target = path.join(dir, "target");
-  fs.mkdirSync(target, { recursive: true });
-
-  const init = runAdapter([target, "--workbench-root", wb]);
-  assert(init.ok, `initial run should succeed; got ${init.status}: ${init.combined}`);
-
-  const configPath = path.join(target, ".opencode.json");
-  for (let i = 0; i < 5; i++) {
-    waitForNewMillisecond();
-    fs.writeFileSync(configPath, `{"n": ${i}}\n`, "utf8");
-    const r = runAdapter([target, "--workbench-root", wb, "--force"]);
-    assert(r.ok, `run ${i} should succeed; got ${r.status}: ${r.combined}`);
-  }
-
-  const backupsDir = path.join(target, ".workbench-backups");
-  assert(fs.existsSync(backupsDir), "backups dir should exist");
-  const entries = fs
-    .readdirSync(backupsDir)
-    .filter((e) => fs.statSync(path.join(backupsDir, e)).isDirectory());
-  assert(entries.length >= 5, `expected at least 5 backup dirs, got ${entries.length}`);
-  const uniq = new Set(entries);
-  assertEqual(uniq.size, entries.length, "all backup directory names must be unique");
 });
 
 test("generated config registers all seven agents", (dir) => {
@@ -357,7 +373,7 @@ test("generated config registers all seven agents", (dir) => {
   const out = runAdapter([target, "--workbench-root", wb]);
   assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
 
-  const config = JSON.parse(fs.readFileSync(path.join(target, ".opencode.json"), "utf8"));
+  const config = JSON.parse(fs.readFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "utf8"));
   assertEqual(config.default_agent, "orchestrator", "default agent should be orchestrator");
   for (const name of AGENT_NAMES) {
     assert(config.agents[name], `agent ${name} should be registered`);
@@ -371,6 +387,82 @@ test("generated config registers all seven agents", (dir) => {
       `agent ${name} should have file system reference`
     );
   }
+});
+
+test("project context: --project-context loads context into meta", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  const ctxPath = makeProjectContext(dir);
+
+  const out = runAdapter([target, "--workbench-root", wb, "--project-context", ctxPath]);
+  assert(out.ok, `adapter should succeed with project context; got ${out.status}: ${out.combined}`);
+
+  const config = JSON.parse(fs.readFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "utf8"));
+  assertEqual(config.meta.project_context, ctxPath, "meta should record project context path");
+  assertEqual(config.meta.workbench_adapter, true, "meta should mark adapter-generated");
+});
+
+test("project-specific command permissions: derived from dev_test_commands", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  const ctxPath = makeProjectContext(dir, {
+    dev_test_commands: "node tests/validate.js npm test git status git diff",
+  });
+
+  const out = runAdapter([target, "--workbench-root", wb, "--project-context", ctxPath]);
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
+
+  const config = JSON.parse(fs.readFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "utf8"));
+  const devPerms = config.agents.developer.permissions;
+  const qaPerms = config.agents["qa-engineer"].permissions;
+
+  const devShellAsks = devPerms.filter((p) => p.action === "shell" && p.effect === "ask").map((p) => p.resource);
+  const qaShellAsks = qaPerms.filter((p) => p.action === "shell" && p.effect === "ask").map((p) => p.resource);
+
+  assert(devShellAsks.includes("node tests/validate.js"), "developer should have ask rule for node tests/validate.js");
+  assert(devShellAsks.includes("npm test"), "developer should have ask rule for npm test");
+  assert(devShellAsks.includes("git status"), "developer should have ask rule for git status");
+  assert(devShellAsks.includes("git diff"), "developer should have ask rule for git diff");
+  assertEqual(qaShellAsks.length, devShellAsks.length, "qa-engineer should mirror developer shell ask rules");
+});
+
+test("project-specific command permissions: no arbitrary commands auto-allowed", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  const ctxPath = makeProjectContext(dir, {
+    dev_test_commands: "node tests/validate.js; rm -rf /",
+  });
+
+  const out = runAdapter([target, "--workbench-root", wb, "--project-context", ctxPath]);
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
+
+  const config = JSON.parse(fs.readFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "utf8"));
+  const devPerms = config.agents.developer.permissions;
+  const devShellAsks = devPerms.filter((p) => p.action === "shell" && p.effect === "ask").map((p) => p.resource);
+  // Commands with shell metacharacters should be rejected, not auto-allowed.
+  assert(!devShellAsks.includes("rm -rf /"), "arbitrary/dangerous command should not be auto-allowed");
+  assert(devShellAsks.includes("node tests/validate.js"), "valid command should be allowed");
+});
+
+test("project-specific command permissions: no context means no extra shell asks", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const out = runAdapter([target, "--workbench-root", wb]);
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
+
+  const config = JSON.parse(fs.readFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "utf8"));
+  const devPerms = config.agents.developer.permissions;
+  const devShellAsks = devPerms.filter((p) => p.action === "shell" && p.effect === "ask");
+  assertEqual(devShellAsks.length, 0, "no project context means no extra shell ask rules");
 });
 
 // --- Summary ------------------------------------------------------------------

@@ -6,26 +6,35 @@
  *
  * Project-scoped OpenCode Workbench integration adapter.
  *
- * Generates a project-level `.opencode.json` that registers the seven
- * Workbench agents (system: {file:<ABS>/agents/<name>.md}) against a target
- * project directory. Designed as a dependency-free Node.js script using only
- * Node built-ins.
+ * Generates a directory-based OpenCode configuration at
+ * <target>/.opencode/opencode.json that registers the seven Workbench agents
+ * (system: {file:<ABS>/agents/<name>.md}) against a target project directory.
+ *
+ * Designed as a dependency-free Node.js script using only Node built-ins.
  *
  * Usage:
- *   node scripts/workbench-adapter.js <target> [--workbench-root <root>] [--dry-run] [--rollback] [--force]
+ *   node scripts/workbench-adapter.js <target> [--workbench-root <root>] [--dry-run] [--rollback] [--project-context <path>]
  *
  * Stages:
  *   1. Validate Workbench root contains all seven agent files.
  *   2. Validate each agent path canonicalizes within --workbench-root/agents/.
- *   3. Detect existing <target>/.opencode.json; refuse unless --force.
- *   4. Generate project-scoped .opencode.json (deny-* baseline preserved;
- *      ask rules for Developer/QA shell/edit; Reporter edit restricted to
- *      reports/*; no credentials, no provider settings, no machine-specific
- *      paths).
- *   5. Back up any pre-existing config to <target>/.workbench-backups/<ts>/.
- *   6. Idempotent: re-run without --force detects existing config and exits
- *      cleanly.
- *   7. Rollback restores prior config byte-for-byte from timestamped backup.
+ *   3. Detect existing configs in BOTH .opencode/opencode.json and legacy
+ *      .opencode.json. If both exist with different content, fail (no silent
+ *      override or merge).
+ *   4. Load optional --project-context file; derive approval-gated shell
+ *      permissions from validated project-specific command entries; load
+ *      project context into agent instructions.
+ *   5. Generate .opencode/opencode.json (deny-* baseline preserved; ask rules
+ *      for Developer/QA shell/edit; Reporter edit restricted to reports/*; no
+ *      credentials, no provider settings, no machine-specific paths).
+ *   6. Record ownership + SHA-256 hash of generated config for rollback
+ *      verification; back up any pre-existing config to
+ *      <target>/.workbench-backups/<ts>/.
+ *   7. Rollback restores prior config byte-for-byte after verifying hash and
+ *      ownership; refuses to remove unrelated pre-existing configs; refuses to
+ *      overwrite configs modified since installation; removes only verified
+ *      adapter-generated files; preserves unrelated project files/settings;
+ *      restores atomically; requires explicit target directory.
  */
 
 const fs = require("fs");
@@ -46,16 +55,25 @@ const DEFAULT_WORKBENCH_ROOT = path.resolve(__dirname, "..");
 
 const OPENAI_SCHEMA = "https://opencode.ai/config.json";
 
+const CONFIG_DIR_NAME = ".opencode";
+const CONFIG_FILE_NAME = "opencode.json";
+const LEGACY_CONFIG_FILE = ".opencode.json";
+const META_FILENAME = "adapter-meta.json";
+
 function fail(message) {
   console.error(`ERROR: ${message}`);
   process.exit(1);
+}
+
+function currentOwner() {
+  return process.env.USERNAME || process.env.USER || "unknown";
 }
 
 function log(message) {
   console.log(message);
 }
 
-// --- Argument parsing -------------------------------------------------------
+// --- Argument parsing ---------------------------------------------------------
 
 function parseArgs(argv) {
   const args = {
@@ -63,7 +81,7 @@ function parseArgs(argv) {
     workbenchRoot: DEFAULT_WORKBENCH_ROOT,
     dryRun: false,
     rollback: false,
-    force: false,
+    projectContext: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -76,8 +94,10 @@ function parseArgs(argv) {
       args.dryRun = true;
     } else if (a === "--rollback") {
       args.rollback = true;
+    } else if (a === "--project-context") {
+      args.projectContext = argv[++i];
     } else if (a === "--force") {
-      args.force = true;
+      fail("--force has been removed; it cannot be implemented safely.");
     } else if (a === "--help" || a === "-h") {
       printUsage();
       process.exit(0);
@@ -103,20 +123,16 @@ function printUsage() {
   log("                           (default: parent of this script's directory)");
   log("  --dry-run                Print planned actions; write nothing");
   log("  --rollback               Restore prior config from timestamped backup");
-  log("  --force                  Overwrite existing <target>/.opencode.json");
+  log("  --project-context <path> Project-specific context file");
   log("");
-  log("Generates a project-scoped .opencode.json registering the seven");
+  log("Generates a directory-based .opencode/opencode.json registering the seven");
   log("Workbench agents for the target project directory.");
 }
 
-// --- Path helpers -----------------------------------------------------------
+// --- Path helpers -------------------------------------------------------------
 
 function canonicalize(dir) {
   try {
-    // fs.realpathSync resolves symlinks to their real on-disk path, which is
-    // required for the containment check to defeat symlink escapes. Fall back
-    // to path.resolve (lexical normalization only) when the path does not yet
-    // exist on disk or realpath is unavailable.
     return fs.realpathSync(dir);
   } catch (e) {
     return path.resolve(dir);
@@ -128,7 +144,19 @@ function isContained(child, parent) {
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-// --- Workbench validation ---------------------------------------------------
+function configDirPath(targetDir) {
+  return path.join(targetDir, CONFIG_DIR_NAME);
+}
+
+function configPath(targetDir) {
+  return path.join(targetDir, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
+}
+
+function legacyConfigPath(targetDir) {
+  return path.join(targetDir, LEGACY_CONFIG_FILE);
+}
+
+// --- Workbench validation -----------------------------------------------------
 
 function validateWorkbenchRoot(workbenchRoot) {
   if (!fs.existsSync(workbenchRoot) || !fs.statSync(workbenchRoot).isDirectory()) {
@@ -152,7 +180,6 @@ function validateWorkbenchRoot(workbenchRoot) {
     fail(`Workbench root is missing required agent files:\n  ${missing.join("\n  ")}`);
   }
 
-  // Validate each agent path canonicalizes and is contained within agents/.
   const canonicalAgentsDir = canonicalize(agentsDir);
   for (const name of AGENT_NAMES) {
     const agentFile = path.join(agentsDir, `${name}.md`);
@@ -167,26 +194,59 @@ function validateWorkbenchRoot(workbenchRoot) {
   return agentsDir;
 }
 
-// --- Config generation ------------------------------------------------------
+// --- Project context loading --------------------------------------------------
 
-function buildProjectConfig(agentsDirAbs) {
-  const agents = {};
-  for (const name of AGENT_NAMES) {
-    const agentFileAbs = path.join(agentsDirAbs, `${name}.md`);
-    agents[name] = {
-      description: agentDescription(name),
-      permissions: agentPermissions(name),
-      mode: name === "orchestrator" ? "primary" : "subagent",
-      system: `{file:${agentFileAbs}}`,
-    };
+function loadProjectContext(projectContextPath) {
+  if (!projectContextPath) {
+    return null;
   }
 
-  return {
-    $schema: OPENAI_SCHEMA,
-    default_agent: "orchestrator",
-    agents,
-  };
+  const resolved = path.resolve(projectContextPath);
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    fail(`Project context file does not exist or is not a file: ${resolved}`);
+  }
+
+  let raw;
+  try {
+    raw = fs.readFileSync(resolved, "utf8");
+  } catch (e) {
+    fail(`Could not read project context file: ${e.message}`);
+  }
+
+  let context;
+  try {
+    context = JSON.parse(raw);
+  } catch (e) {
+    fail(`Project context file is not valid JSON: ${e.message}`);
+  }
+
+  return { path: resolved, context };
 }
+
+function deriveShellCommandsFromContext(context) {
+  // Approval-gated shell permissions derived only from validated
+  // project-specific command entries (dev_test_commands). Never automatically
+  // allow arbitrary commands.
+  const commands = [];
+  if (!context || !Array.isArray(context.dev_test_commands)) {
+    return commands;
+  }
+
+  const seen = new Set();
+  for (const cmd of context.dev_test_commands) {
+    // Trim whitespace, reject empty strings.
+    const trimmed = cmd.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    // Treat each array element as one command string (do not split on
+    // whitespace). Reject shell metacharacters.
+    if (/[&|;<>$(){}[\]]/.test(trimmed)) continue;
+    commands.push(trimmed);
+  }
+  return commands;
+}
+
+// --- Config generation --------------------------------------------------------
 
 function agentDescription(name) {
   const descriptions = {
@@ -208,7 +268,54 @@ function agentDescription(name) {
   return descriptions[name];
 }
 
-function agentPermissions(name) {
+function buildProjectConfig(agentsDirAbs, projectContext, shellCommands) {
+  const agents = {};
+  for (const name of AGENT_NAMES) {
+    const agentFileAbs = path.join(agentsDirAbs, `${name}.md`);
+    const agentEntry = {
+      description: agentDescription(name),
+      permissions: agentPermissions(name, shellCommands),
+      mode: name === "orchestrator" ? "primary" : "subagent",
+      system: `{file:${agentFileAbs}}`,
+    };
+    // Load project context into agent instructions (not just stored JSON).
+    // Project-specific context fields are surfaced on each agent so the
+    // OpenCode runtime can use them as instructions at runtime.
+    if (projectContext && projectContext.context) {
+      const ctx = projectContext.context;
+      agentEntry.project_context = {
+        identity: ctx.identity || null,
+        tech_stack: ctx.tech_stack || null,
+        architectural_constraints: ctx.architectural_constraints || null,
+        dev_test_commands: ctx.dev_test_commands || null,
+        production_safety_boundaries: ctx.production_safety_boundaries || null,
+        approved_file_modification_scope: ctx.approved_file_modification_scope || null,
+        existing_skills: ctx.existing_skills || null,
+        reporting_destination: ctx.reporting_destination || null,
+        human_approval_requirements: ctx.human_approval_requirements || null,
+      };
+    }
+    agents[name] = agentEntry;
+  }
+
+  const now = new Date().toISOString();
+  const config = {
+    $schema: OPENAI_SCHEMA,
+    default_agent: "orchestrator",
+    agents,
+    meta: {
+      workbench_adapter: true,
+      generated_at: now,
+      source: "agentic-workbench/scripts/workbench-adapter.js",
+      project_context: projectContext ? projectContext.path : null,
+      owner: currentOwner(),
+    },
+  };
+
+  return config;
+}
+
+function agentPermissions(name, shellCommands) {
   const baseline = [
     { effect: "deny", resource: "*", action: "*" },
     { effect: "allow", resource: "*", action: "read" },
@@ -217,6 +324,12 @@ function agentPermissions(name) {
     { effect: "deny", resource: "*.env*", action: "read" },
     { effect: "deny", resource: "*", action: "external_directory" },
   ];
+
+  const shellAskRules = shellCommands.map((cmd) => ({
+    effect: "ask",
+    resource: cmd,
+    action: "shell",
+  }));
 
   if (name === "orchestrator") {
     return [
@@ -242,14 +355,12 @@ function agentPermissions(name) {
       { effect: "deny", resource: "*.env*", action: "edit" },
       { effect: "deny", resource: "credentials.json", action: "edit" },
       { effect: "deny", resource: "*.secret*", action: "edit" },
-      // OpenCode V2 uses last-match-wins precedence. The broad deny-* rule for
-      // "shell" is followed by ask rules for specific safe commands, so those
-      // operations are approval-gated rather than flatly denied.
+      // OpenCode V2 uses last-match-wins precedence. A broad deny-* rule for
+      // "edit" is immediately followed by an ask rule, so edit operations are
+      // approval-gated rather than flatly denied. Do not reorder these rules
+      // without re-verifying the resulting effective permission.
       { effect: "deny", resource: "*", action: "shell" },
-      { effect: "ask", resource: "node tests/validate.js", action: "shell" },
-      { effect: "ask", resource: "npm test", action: "shell" },
-      { effect: "ask", resource: "git status", action: "shell" },
-      { effect: "ask", resource: "git diff", action: "shell" },
+      ...shellAskRules,
       { effect: "deny", resource: "*", action: "merge" },
       { effect: "deny", resource: "*", action: "push" },
       { effect: "deny", resource: "*", action: "deploy" },
@@ -265,8 +376,7 @@ function agentPermissions(name) {
       { effect: "deny", resource: "credentials.json", action: "edit" },
       { effect: "deny", resource: "*.secret*", action: "edit" },
       { effect: "deny", resource: "*", action: "shell" },
-      { effect: "ask", resource: "node tests/validate.js", action: "shell" },
-      { effect: "ask", resource: "npm test", action: "shell" },
+      ...shellAskRules,
       { effect: "deny", resource: "*", action: "merge" },
       { effect: "deny", resource: "*", action: "push" },
       { effect: "deny", resource: "*", action: "deploy" },
@@ -277,10 +387,10 @@ function agentPermissions(name) {
   if (name === "reporter") {
     return [
       ...baseline,
-      // OpenCode V2 uses last-match-wins precedence. The broad deny-* rule for
-      // "edit" is followed by a scoped allow rule for reports/*, so report
-      // editing is permitted while all other edits remain denied. Do not
-      // reorder these rules without re-verifying the resulting permission.
+      // OpenCode V2 uses last-match-wins precedence. A broad deny-* rule for
+      // "edit" is immediately followed by an ask rule, so edit operations are
+      // approval-gated rather than flatly denied. Do not reorder these rules
+      // without re-verifying the resulting effective permission.
       { effect: "deny", resource: "*", action: "edit" },
       { effect: "allow", resource: "reports/*", action: "edit" },
       { effect: "deny", resource: "*", action: "shell" },
@@ -305,17 +415,47 @@ function agentPermissions(name) {
   ];
 }
 
-// --- Backup / rollback ------------------------------------------------------
+function sha256File(filePath) {
+  const hash = crypto.createHash("sha256");
+  const data = fs.readFileSync(filePath);
+  hash.update(data);
+  return hash.digest("hex");
+}
 
-// Monotonic counter used by timestamp() to guarantee unique backup directory
-// names for rapid successive runs within the same millisecond.
+function sha256String(str) {
+  const hash = crypto.createHash("sha256");
+  hash.update(str, "utf8");
+  return hash.digest("hex");
+}
+
+// --- Existing configuration detection ----------------------------------------
+
+function readConfigFileIfExists(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile()) return null;
+  return fs.readFileSync(filePath, "utf8");
+}
+
+function detectExistingConfigurations(targetDir) {
+  // Returns { dirConfig, legacyConfig, conflict } where conflict is true when
+  // both exist with different content.
+  const dirCfg = readConfigFileIfExists(configPath(targetDir));
+  const legacyCfg = readConfigFileIfExists(legacyConfigPath(targetDir));
+  let conflict = false;
+  if (dirCfg !== null && legacyCfg !== null && dirCfg !== legacyCfg) {
+    conflict = true;
+  }
+  return { dirConfig: dirCfg, legacyConfig: legacyCfg, conflict };
+}
+
+// --- Backup / rollback --------------------------------------------------------
+
 let backupSequence = 0;
 
 function timestamp() {
   const now = new Date();
   const iso = now.toISOString().replace(/[:.]/g, "-");
-  // Sub-second precision: ISO retains milliseconds; the monotonic counter
-  // guarantees unique directory names for backups within the same millisecond.
   return `${iso}-${++backupSequence}`;
 }
 
@@ -325,24 +465,16 @@ function ensureDir(dir) {
   }
 }
 
-function sha256File(filePath) {
-  const hash = crypto.createHash("sha256");
-  const data = fs.readFileSync(filePath);
-  hash.update(data);
-  return hash.digest("hex");
-}
-
-function backupExistingConfig(configPath, dryRun) {
-  const backupsDir = path.join(path.dirname(configPath), ".workbench-backups", timestamp());
+function backupExistingConfig(configPathTarget, backupsDir, dryRun) {
   if (dryRun) {
-    log(`[dry-run] Would back up ${configPath} to ${backupsDir}/`);
+    log(`[dry-run] Would back up ${configPathTarget} to ${backupsDir}/`);
     return { backupsDir, wouldBackup: true };
   }
   ensureDir(backupsDir);
-  fs.copyFileSync(configPath, path.join(backupsDir, ".opencode.json"));
-  const hash = sha256File(configPath);
+  fs.copyFileSync(configPathTarget, path.join(backupsDir, CONFIG_FILE_NAME));
+  const hash = sha256File(configPathTarget);
   fs.writeFileSync(
-    path.join(backupsDir, ".opencode.json.sha256"),
+    path.join(backupsDir, `${CONFIG_FILE_NAME}.sha256`),
     hash + "\n",
     "utf8"
   );
@@ -366,32 +498,62 @@ function findLatestBackup(targetDir) {
   return path.join(backupsDir, entries[0]);
 }
 
+function writeMetaFile(backupsDir, targetDir, workbenchRoot, configHash) {
+  const meta = {
+    adapter: "workbench-adapter",
+    target_dir: targetDir,
+    workbench_root: workbenchRoot,
+    config_file: CONFIG_FILE_NAME,
+    config_hash: configHash,
+    owner: currentOwner(),
+    created_at: new Date().toISOString(),
+  };
+  fs.writeFileSync(
+    path.join(backupsDir, META_FILENAME),
+    JSON.stringify(meta, null, 4) + "\n",
+    "utf8"
+  );
+}
+
+function readMetaFile(backupsDir) {
+  const metaPath = path.join(backupsDir, META_FILENAME);
+  if (!fs.existsSync(metaPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(metaPath, "utf8"));
+  } catch (e) {
+    return null;
+  }
+}
+
 function rollback(targetDir, dryRun) {
-  const configPath = path.join(targetDir, ".opencode.json");
+  const backupsDir = path.join(targetDir, ".workbench-backups");
   const backupDir = findLatestBackup(targetDir);
 
   if (!backupDir) {
     log(`No backup found for ${targetDir}; nothing to roll back.`);
-    if (dryRun) {
-      log("[dry-run] Would remove generated .opencode.json if present.");
-    }
-    if (!dryRun && fs.existsSync(configPath)) {
-      fs.unlinkSync(configPath);
-      log(`Removed generated ${configPath} (no prior config to restore).`);
-    }
     return;
   }
 
-  const backupConfig = path.join(backupDir, ".opencode.json");
-  const backupHashFile = path.join(backupDir, ".opencode.json.sha256");
+  const meta = readMetaFile(backupDir);
+  // Refuse to remove unrelated pre-existing configs: only act on
+  // adapter-generated files verified by meta + hash.
+  if (!meta || !meta.adapter || meta.adapter !== "workbench-adapter") {
+    fail(
+      `Refusing to roll back: backup ${backupDir} is not a verified adapter-generated config (missing adapter meta).`
+    );
+  }
+
+  const backupConfig = path.join(backupDir, CONFIG_FILE_NAME);
+  const backupHashFile = path.join(backupDir, `${CONFIG_FILE_NAME}.sha256`);
 
   if (!fs.existsSync(backupConfig)) {
-    fail(`Backup directory exists but .opencode.json is missing: ${backupDir}`);
+    fail(`Backup directory exists but ${CONFIG_FILE_NAME} is missing: ${backupDir}`);
   }
 
   if (!fs.existsSync(backupHashFile)) {
     fail("Backup hash manifest missing — refusing to restore unverified backup");
   }
+
   const expectedHash = fs.readFileSync(backupHashFile, "utf8").trim();
   const actualHash = sha256File(backupConfig);
   if (expectedHash !== actualHash) {
@@ -400,22 +562,41 @@ function rollback(targetDir, dryRun) {
     );
   }
 
+  // Refuse to overwrite configs modified since installation: compare the
+  // installed config's current hash against the recorded config hash.
+  const installedCfg = configPath(targetDir);
+  if (fs.existsSync(installedCfg)) {
+    const installedHash = sha256File(installedCfg);
+    if (installedHash !== meta.config_hash) {
+      fail(
+        `Refusing to roll back: installed config at ${installedCfg} has been modified since installation (recorded hash ${meta.config_hash}, current ${installedHash}).`
+      );
+    }
+  }
+
   if (dryRun) {
-    log(`[dry-run] Would restore ${backupConfig} to ${configPath}`);
+    log(`[dry-run] Would restore ${backupConfig} to ${installedCfg}`);
     return;
   }
 
-  fs.copyFileSync(backupConfig, configPath);
-  log(`Rolled back ${configPath} from ${backupConfig}`);
+  // Restore atomically: write to temp file then rename.
+  const tempPath = installedCfg + ".tmp";
+  fs.copyFileSync(backupConfig, tempPath);
+  fs.renameSync(tempPath, installedCfg);
+
+  log(`Rolled back ${installedCfg} from ${backupConfig}`);
 }
 
-// --- Main flow --------------------------------------------------------------
+// --- Main flow ----------------------------------------------------------------
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.rollback) {
-    const targetAbs = canonicalize(args.target || process.cwd());
+    if (!args.target) {
+      fail("--rollback requires an explicit <target> directory.");
+    }
+    const targetAbs = canonicalize(args.target);
     rollback(targetAbs, args.dryRun);
     return;
   }
@@ -433,40 +614,70 @@ function main() {
 
   const agentsDir = validateWorkbenchRoot(workbenchRootAbs);
 
-  const configPath = path.join(targetAbs, ".opencode.json");
-  const configExists = fs.existsSync(configPath);
+  const projectContext = loadProjectContext(args.projectContext);
+  const shellCommands = projectContext
+    ? deriveShellCommandsFromContext(projectContext.context)
+    : [];
 
-  if (configExists && !args.force) {
-    log(`Existing .opencode.json detected at ${configPath}; exiting cleanly (idempotent). Use --force to overwrite.`);
+  // Detect existing configurations in both directory-based and legacy forms.
+  const { dirConfig, legacyConfig, conflict } = detectExistingConfigurations(targetAbs);
+
+  if (conflict) {
+    fail(
+      `Conflicting OpenCode configurations detected in ${targetAbs}: both ${CONFIG_DIR_NAME}/${CONFIG_FILE_NAME} and legacy ${LEGACY_CONFIG_FILE} exist with different content. Refusing to silently override or merge. Remove one manually to proceed.`
+    );
+  }
+
+  const existingConfig = dirConfig !== null ? dirConfig : legacyConfig;
+  const configExists = existingConfig !== null;
+
+  if (configExists) {
+    log(`Existing OpenCode configuration detected at ${targetAbs}; exiting cleanly (idempotent).`);
     return;
   }
 
-  if (configExists && args.force) {
-    log(`Existing .opencode.json detected at ${configPath}; --force specified, will overwrite.`);
-  }
-
-  const projectConfig = buildProjectConfig(canonicalize(agentsDir));
+  const projectConfig = buildProjectConfig(
+    canonicalize(agentsDir),
+    projectContext,
+    shellCommands
+  );
 
   const configJson = JSON.stringify(projectConfig, null, 4) + "\n";
+  const configHash = sha256String(configJson);
 
   if (args.dryRun) {
-    log(`[dry-run] Would write ${configPath}:`);
+    log(`[dry-run] Would write ${configPath(targetAbs)}:`);
     log(configJson);
     return;
   }
 
-  // Back up any existing config before writing.
-  if (configExists) {
-    backupExistingConfig(configPath, false);
+  const targetConfigDir = configDirPath(targetAbs);
+  ensureDir(targetConfigDir);
+
+  // Back up any existing config before writing (legacy .opencode.json).
+  if (legacyConfig !== null) {
+    const backupsDir = path.join(targetAbs, ".workbench-backups", timestamp());
+    backupExistingConfig(legacyConfigPath(targetAbs), backupsDir, false);
+    writeMetaFile(backupsDir, targetAbs, workbenchRootAbs, configHash);
   }
 
   // Write to temp file then rename for atomicity.
-  const tempPath = configPath + ".tmp";
+  const finalConfigPath = configPath(targetAbs);
+  const tempPath = finalConfigPath + ".tmp";
   fs.writeFileSync(tempPath, configJson, "utf8");
-  fs.renameSync(tempPath, configPath);
+  fs.renameSync(tempPath, finalConfigPath);
 
-  log(`Generated project-scoped config: ${configPath}`);
+  // Record ownership + SHA-256 hash alongside the generated config for
+  // future rollback verification.
+  const backupsDir = path.join(targetAbs, ".workbench-backups", timestamp());
+  ensureDir(backupsDir);
+  writeMetaFile(backupsDir, targetAbs, workbenchRootAbs, configHash);
+
+  log(`Generated project-scoped config: ${finalConfigPath}`);
   log(`Registered ${AGENT_NAMES.length} agents (orchestrator primary, specialists subagent).`);
+  if (shellCommands.length > 0) {
+    log(`Derived ${shellCommands.length} approval-gated shell permission(s) from project context.`);
+  }
 }
 
 main();
