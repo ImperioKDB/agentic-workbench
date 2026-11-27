@@ -66,7 +66,7 @@ The reviewer independently inspects implementation changes, reviews security arc
 
 ## Workbench-Specific Restrictions
 
-- Reviews only; does not merge.
+- When operating in the `agentic-workbench` repository: reviews only; does not merge.
 - Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - No shell command execution.
 - No push or deploy.

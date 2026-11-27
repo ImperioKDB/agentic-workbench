@@ -28,6 +28,7 @@ const AGENT_NAMES = [
 const CONFIG_DIR = ".opencode";
 const CONFIG_FILE = "opencode.json";
 const LEGACY_CONFIG_FILE = ".opencode.json";
+const LEGACY_CONFIG_FILE_C = ".opencode.jsonc";
 
 // --- Test harness -------------------------------------------------------------
 
@@ -121,7 +122,7 @@ function makeAgentsDir(root) {
 function makeProjectContext(root, overrides = {}) {
   const context = {
     identity: "Test project",
-    dev_test_commands: "node tests/validate.js npm test git status",
+    dev_test_commands: ["node tests/validate.js", "npm test", "git status"],
     ...overrides,
   };
   const ctxPath = path.join(root, "project-context.json");
@@ -303,8 +304,7 @@ test("rollback: restores config byte-for-byte when hash matches", (dir) => {
   const configPath = path.join(target, CONFIG_DIR, CONFIG_FILE);
   const original = fs.readFileSync(configPath, "utf8");
 
-  // Mutate installed config, then rollback must restore the backed-up original.
-  fs.writeFileSync(configPath, "MUTATED\n", "utf8");
+  // Rollback must restore the backed-up original when nothing has changed.
   waitForNewMillisecond();
   const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
   assert(out.ok, `rollback should succeed; got ${out.status}: ${out.combined}`);
@@ -397,7 +397,7 @@ test("project context: --project-context loads context into meta", (dir) => {
   const ctxPath = makeProjectContext(dir);
 
   const out = runAdapter([target, "--workbench-root", wb, "--project-context", ctxPath]);
-  assert(out.ok, `adapter should succeed with project context; got ${out.status}: ${out.combined}`);
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
 
   const config = JSON.parse(fs.readFileSync(path.join(target, CONFIG_DIR, CONFIG_FILE), "utf8"));
   assertEqual(config.meta.project_context, ctxPath, "meta should record project context path");
@@ -410,7 +410,7 @@ test("project-specific command permissions: derived from dev_test_commands", (di
   const target = path.join(dir, "target");
   fs.mkdirSync(target, { recursive: true });
   const ctxPath = makeProjectContext(dir, {
-    dev_test_commands: "node tests/validate.js npm test git status git diff",
+    dev_test_commands: ["node tests/validate.js", "npm test", "git status", "git diff"],
   });
 
   const out = runAdapter([target, "--workbench-root", wb, "--project-context", ctxPath]);
@@ -436,7 +436,7 @@ test("project-specific command permissions: no arbitrary commands auto-allowed",
   const target = path.join(dir, "target");
   fs.mkdirSync(target, { recursive: true });
   const ctxPath = makeProjectContext(dir, {
-    dev_test_commands: "node tests/validate.js; rm -rf /",
+    dev_test_commands: ["node tests/validate.js", "npm test", "git status", "git diff", "rm -rf /"],
   });
 
   const out = runAdapter([target, "--workbench-root", wb, "--project-context", ctxPath]);

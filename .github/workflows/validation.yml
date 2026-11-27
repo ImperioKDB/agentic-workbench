@@ -26,3 +26,6 @@ jobs:
 
       - name: Run Node.js validation
         run: node tests/validate.js
+
+      - name: Run adapter validation
+        run: node tests/workbench-adapter.test.js

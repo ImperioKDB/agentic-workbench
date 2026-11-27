@@ -69,7 +69,7 @@ The developer implements approved changes following project conventions. It crea
 
 ## Workbench-Specific Restrictions
 
-- Implements code changes on feature branches within the `agentic-workbench` repository.
+- When operating in the `agentic-workbench` repository: implements code changes on feature branches within that repository.
 - No autonomous deployment.
 - No edits to `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - No edits to credential files (`*.env*`, `credentials.json`, `*.secret*`).

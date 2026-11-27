@@ -66,7 +66,7 @@ The planner converts requirements into implementation plans. It identifies affec
 
 ## Workbench-Specific Restrictions
 
-- Planning only; no execution without orchestrator delegation.
+- When operating in the `agentic-workbench` repository: planning only; no execution without orchestrator delegation.
 - Does not implement code changes.
 - Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - No shell command execution.

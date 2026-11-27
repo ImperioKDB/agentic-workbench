@@ -72,7 +72,7 @@ The QA engineer runs relevant tests, validates expected behaviour, detects regre
 
 ## Workbench-Specific Restrictions
 
-- Shell access limited to specifically justified, harmless commands only; arbitrary shell execution requires per-command human approval.
+- When operating in the `agentic-workbench` repository: shell access limited to specifically justified, harmless commands only; arbitrary shell execution requires per-command human approval.
 - No direct application source code modifications.
 - No production-connected testing without separate authorization.
 - Reports defects; does not approve releases.

@@ -58,6 +58,7 @@ const OPENAI_SCHEMA = "https://opencode.ai/config.json";
 const CONFIG_DIR_NAME = ".opencode";
 const CONFIG_FILE_NAME = "opencode.json";
 const LEGACY_CONFIG_FILE = ".opencode.json";
+const LEGACY_CONFIG_FILE_C = ".opencode.jsonc";
 const META_FILENAME = "adapter-meta.json";
 
 function fail(message) {
@@ -156,6 +157,14 @@ function legacyConfigPath(targetDir) {
   return path.join(targetDir, LEGACY_CONFIG_FILE);
 }
 
+function legacyConfigPathC(targetDir) {
+  return path.join(targetDir, LEGACY_CONFIG_FILE_C);
+}
+
+function dirConfigPathC(targetDir) {
+  return path.join(targetDir, CONFIG_DIR_NAME, LEGACY_CONFIG_FILE_C);
+}
+
 // --- Workbench validation -----------------------------------------------------
 
 function validateWorkbenchRoot(workbenchRoot) {
@@ -213,37 +222,34 @@ function loadProjectContext(projectContextPath) {
     fail(`Could not read project context file: ${e.message}`);
   }
 
-  let context;
+  let parsed;
   try {
-    context = JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch (e) {
     fail(`Project context file is not valid JSON: ${e.message}`);
   }
 
-  return { path: resolved, context };
-}
+  // Support both flat context files and { context: {...} } wrapped files.
+  const ctx = parsed.context && typeof parsed.context === "object" ? parsed.context : parsed;
 
-function deriveShellCommandsFromContext(context) {
-  // Approval-gated shell permissions derived only from validated
-  // project-specific command entries (dev_test_commands). Never automatically
-  // allow arbitrary commands.
-  const commands = [];
-  if (!context || !Array.isArray(context.dev_test_commands)) {
-    return commands;
+  // Validate project context structure.
+  if (ctx.dev_test_commands !== undefined) {
+    const raw = ctx.dev_test_commands;
+    const cmdList = Array.isArray(raw) ? raw : String(raw).split(/\s+/);
+    for (const cmd of cmdList) {
+      const trimmed = cmd.trim();
+      if (!trimmed) continue;
+      if (typeof trimmed !== "string") {
+        fail(`Project context 'dev_test_commands' entries must be strings; got: ${typeof trimmed}`);
+      }
+      // Reject shell metacharacters
+      if (/[&|;<>$(){}[\]]/.test(trimmed)) {
+        fail(`Project context command contains shell metacharacters: ${cmd}`);
+      }
+    }
   }
 
-  const seen = new Set();
-  for (const cmd of context.dev_test_commands) {
-    // Trim whitespace, reject empty strings.
-    const trimmed = cmd.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    // Treat each array element as one command string (do not split on
-    // whitespace). Reject shell metacharacters.
-    if (/[&|;<>$(){}[\]]/.test(trimmed)) continue;
-    commands.push(trimmed);
-  }
-  return commands;
+  return { path: resolved, context: ctx };
 }
 
 // --- Config generation --------------------------------------------------------
@@ -268,6 +274,36 @@ function agentDescription(name) {
   return descriptions[name];
 }
 
+function deriveShellCommandsFromContext(context) {
+  if (!context) {
+    return [];
+  }
+  const raw = context.dev_test_commands;
+  if (raw === undefined || raw === null) {
+    return [];
+  }
+  // dev_test_commands must be an array of command strings.
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const commands = [];
+  const seen = new Set();
+  for (const rawCmd of raw) {
+    if (typeof rawCmd !== "string") continue;
+    const cmd = rawCmd.trim();
+    if (!cmd || seen.has(cmd)) continue;
+    seen.add(cmd);
+    // Reject wildcard permission patterns.
+    if (cmd === "*") continue;
+    // Reject shell metacharacters and ambiguous syntax.
+    if (/[&|;<>$(){}[\]]/.test(cmd)) continue;
+    // Reject destructive rm -rf patterns.
+    if (/\brm\s+-rf\b/.test(cmd)) continue;
+    commands.push({ effect: "ask", resource: cmd, action: "shell" });
+  }
+  return commands;
+}
+
 function buildProjectConfig(agentsDirAbs, projectContext, shellCommands) {
   const agents = {};
   for (const name of AGENT_NAMES) {
@@ -279,11 +315,9 @@ function buildProjectConfig(agentsDirAbs, projectContext, shellCommands) {
       system: `{file:${agentFileAbs}}`,
     };
     // Load project context into agent instructions (not just stored JSON).
-    // Project-specific context fields are surfaced on each agent so the
-    // OpenCode runtime can use them as instructions at runtime.
     if (projectContext && projectContext.context) {
       const ctx = projectContext.context;
-      agentEntry.project_context = {
+      agentEntry.instructions = {
         identity: ctx.identity || null,
         tech_stack: ctx.tech_stack || null,
         architectural_constraints: ctx.architectural_constraints || null,
@@ -325,11 +359,7 @@ function agentPermissions(name, shellCommands) {
     { effect: "deny", resource: "*", action: "external_directory" },
   ];
 
-  const shellAskRules = shellCommands.map((cmd) => ({
-    effect: "ask",
-    resource: cmd,
-    action: "shell",
-  }));
+  const shellAskRules = shellCommands;
 
   if (name === "orchestrator") {
     return [
@@ -356,7 +386,7 @@ function agentPermissions(name, shellCommands) {
       { effect: "deny", resource: "credentials.json", action: "edit" },
       { effect: "deny", resource: "*.secret*", action: "edit" },
       // OpenCode V2 uses last-match-wins precedence. A broad deny-* rule for
-      // "edit" is immediately followed by an ask rule, so edit operations are
+      // "shell" is immediately followed by ask rules, so shell operations are
       // approval-gated rather than flatly denied. Do not reorder these rules
       // without re-verifying the resulting effective permission.
       { effect: "deny", resource: "*", action: "shell" },
@@ -438,15 +468,24 @@ function readConfigFileIfExists(filePath) {
 }
 
 function detectExistingConfigurations(targetDir) {
-  // Returns { dirConfig, legacyConfig, conflict } where conflict is true when
-  // both exist with different content.
+  // Returns { dirConfig, legacyConfig, jsoncConfig, dirConfigC, conflict }
+  // where conflict is true when any two configs exist with different content.
   const dirCfg = readConfigFileIfExists(configPath(targetDir));
   const legacyCfg = readConfigFileIfExists(legacyConfigPath(targetDir));
+  const jsoncCfg = readConfigFileIfExists(legacyConfigPathC(targetDir));
+  const dirCfgC = readConfigFileIfExists(dirConfigPathC(targetDir));
   let conflict = false;
-  if (dirCfg !== null && legacyCfg !== null && dirCfg !== legacyCfg) {
-    conflict = true;
+  const cfgs = [dirCfg, legacyCfg, jsoncCfg, dirCfgC].filter((c) => c !== null);
+  for (let i = 0; i < cfgs.length; i++) {
+    for (let j = i + 1; j < cfgs.length; j++) {
+      if (cfgs[i] !== cfgs[j]) {
+        conflict = true;
+        break;
+      }
+    }
+    if (conflict) break;
   }
-  return { dirConfig: dirCfg, legacyConfig: legacyCfg, conflict };
+  return { dirConfig: dirCfg, legacyConfig: legacyCfg, jsoncConfig: jsoncCfg, dirConfigC: dirCfgC, conflict };
 }
 
 // --- Backup / rollback --------------------------------------------------------
@@ -463,6 +502,24 @@ function ensureDir(dir) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+function ensureGitignoreEntries(targetDir, dryRun) {
+  const gitignorePath = path.join(targetDir, ".gitignore");
+  const entries = [".opencode/", ".workbench-backups/"];
+  let existing = "";
+  if (fs.existsSync(gitignorePath)) {
+    existing = fs.readFileSync(gitignorePath, "utf8");
+  }
+  const missing = entries.filter((e) => !existing.split("\n").includes(e));
+  if (missing.length === 0) return;
+  if (dryRun) {
+    log(`[dry-run] Would append to ${gitignorePath}: ${missing.join(", ")}`);
+    return;
+  }
+  const append = existing.endsWith("\n") ? "" : "\n";
+  fs.appendFileSync(gitignorePath, append + missing.join("\n") + "\n", "utf8");
+  log(`Updated ${gitignorePath} with workbench-generated path exclusions.`);
 }
 
 function backupExistingConfig(configPathTarget, backupsDir, dryRun) {
@@ -543,6 +600,20 @@ function rollback(targetDir, dryRun) {
     );
   }
 
+  // Verify adapter ownership: only the adapter owner can roll back its own config.
+  if (meta.owner && meta.owner !== currentOwner()) {
+    fail(
+      `Refusing to roll back: config was installed by ${meta.owner}, current owner is ${currentOwner()}.`
+    );
+  }
+
+  // Verify canonical target identity: the backup must belong to this target.
+  if (meta.target_dir && meta.target_dir !== canonicalize(targetDir)) {
+    fail(
+      `Refusing to roll back: backup target ${meta.target_dir} does not match current target ${canonicalize(targetDir)}.`
+    );
+  }
+
   const backupConfig = path.join(backupDir, CONFIG_FILE_NAME);
   const backupHashFile = path.join(backupDir, `${CONFIG_FILE_NAME}.sha256`);
 
@@ -612,6 +683,15 @@ function main() {
     fail(`Target directory does not exist: ${targetAbs}`);
   }
 
+  // Reject symlink or junction escapes: the canonical config destination must
+  // be contained within the canonical target directory.
+  const canonicalConfigPath = canonicalize(configPath(targetAbs));
+  if (!isContained(canonicalConfigPath, targetAbs)) {
+    fail(
+      `Refusing to write config: ${canonicalConfigPath} escapes target directory ${targetAbs} via symlink or junction.`
+    );
+  }
+
   const agentsDir = validateWorkbenchRoot(workbenchRootAbs);
 
   const projectContext = loadProjectContext(args.projectContext);
@@ -619,16 +699,16 @@ function main() {
     ? deriveShellCommandsFromContext(projectContext.context)
     : [];
 
-  // Detect existing configurations in both directory-based and legacy forms.
-  const { dirConfig, legacyConfig, conflict } = detectExistingConfigurations(targetAbs);
+  // Detect existing configurations in all known locations.
+  const { dirConfig, legacyConfig, jsoncConfig, dirConfigC, conflict } = detectExistingConfigurations(targetAbs);
 
   if (conflict) {
     fail(
-      `Conflicting OpenCode configurations detected in ${targetAbs}: both ${CONFIG_DIR_NAME}/${CONFIG_FILE_NAME} and legacy ${LEGACY_CONFIG_FILE} exist with different content. Refusing to silently override or merge. Remove one manually to proceed.`
+      `Conflicting OpenCode configurations detected in ${targetAbs}: multiple OpenCode config locations exist with different content (${CONFIG_DIR_NAME}/${CONFIG_FILE_NAME}, ${CONFIG_DIR_NAME}/${LEGACY_CONFIG_FILE_C}, legacy ${LEGACY_CONFIG_FILE}, legacy ${LEGACY_CONFIG_FILE_C}). Refusing to silently override or merge. Remove conflicting configs manually to proceed.`
     );
   }
 
-  const existingConfig = dirConfig !== null ? dirConfig : legacyConfig;
+  const existingConfig = dirConfig !== null ? dirConfig : legacyConfig !== null ? legacyConfig : jsoncConfig !== null ? jsoncConfig : dirConfigC;
   const configExists = existingConfig !== null;
 
   if (configExists) {
@@ -668,9 +748,16 @@ function main() {
   fs.renameSync(tempPath, finalConfigPath);
 
   // Record ownership + SHA-256 hash alongside the generated config for
-  // future rollback verification.
+  // future rollback verification. Back up the generated config itself so
+  // rollback can restore it byte-for-byte.
   const backupsDir = path.join(targetAbs, ".workbench-backups", timestamp());
   ensureDir(backupsDir);
+  fs.copyFileSync(finalConfigPath, path.join(backupsDir, CONFIG_FILE_NAME));
+  fs.writeFileSync(
+    path.join(backupsDir, `${CONFIG_FILE_NAME}.sha256`),
+    configHash + "\n",
+    "utf8"
+  );
   writeMetaFile(backupsDir, targetAbs, workbenchRootAbs, configHash);
 
   log(`Generated project-scoped config: ${finalConfigPath}`);
@@ -678,6 +765,10 @@ function main() {
   if (shellCommands.length > 0) {
     log(`Derived ${shellCommands.length} approval-gated shell permission(s) from project context.`);
   }
+
+  // Prevent accidental publication of machine-specific generated files in the
+  // target project's Git repository. Preserve existing project ignore rules.
+  ensureGitignoreEntries(targetAbs, args.dryRun);
 }
 
 main();

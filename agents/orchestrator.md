@@ -76,7 +76,7 @@ The orchestrator coordinates multi-agent orchestration workflows across the Pers
 
 ## Workbench-Specific Restrictions
 
-- Operates only within the `agentic-workbench` repository.
+- When operating in the `agentic-workbench` repository: operates only within that repository.
 - Reads project configurations from `projects/` and workflow definitions from `workflows/`.
 - Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - Does not execute code autonomously.

@@ -64,7 +64,7 @@ The researcher investigates codebases and documentation, researches technical so
 
 ## Workbench-Specific Restrictions
 
-- Read-only operations where possible.
+- When operating in the `agentic-workbench` repository: read-only operations where possible.
 - No autonomous writes to production repositories.
 - Does not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
 - No shell command execution.

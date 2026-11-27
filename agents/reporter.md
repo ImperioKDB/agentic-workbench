@@ -77,7 +77,7 @@ The reporter receives execution evidence from the Orchestrator and specialist ag
 
 ## Workbench-Specific Restrictions
 
-- Edit access restricted to `reports/` directory only; cannot edit outside `reports/*`.
+- When operating in the `agentic-workbench` repository: edit access restricted to `reports/` directory only; cannot edit outside `reports/*`.
 - No modifications to application source code or agent configuration (`agents/*`, `opencode.json`, `workbench-manifest.json`).
 - No shell execution.
 - No autonomous merge, deployment, or Git push.
