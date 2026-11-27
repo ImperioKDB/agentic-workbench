@@ -1,79 +1,320 @@
 {
-  "name": "personal-agentic-workbench",
-  "description": "Reusable OpenCode-native personal agentic orchestration and workflow system.",
-  "version": "0.2.0",
-  "agents": [
-    {
-      "name": "orchestrator",
-      "file": "agents/orchestrator.md",
-      "description": "Coordinates multi-agent orchestration workflows, decomposes tasks, delegates to specialists, enforces approval gates, and produces final execution summaries."
-    },
-    {
-      "name": "researcher",
-      "file": "agents/researcher.md",
-      "description": "Investigates codebases and documentation, researches technical solutions, compares implementation approaches, and produces evidence-based research reports."
-    },
-    {
-      "name": "planner",
-      "file": "agents/planner.md",
-      "description": "Converts requirements into implementation plans, identifies affected files and systems, defines acceptance criteria, and breaks work into independently verifiable stages."
-    },
-    {
-      "name": "developer",
-      "file": "agents/developer.md",
-      "description": "Implements approved changes following project conventions, creates isolated branches, writes maintainable code, and avoids unrelated modifications."
-    },
-    {
-      "name": "qa-engineer",
-      "file": "agents/qa-engineer.md",
-      "description": "Runs relevant tests, validates expected behaviour, detects regressions, verifies builds and configurations, and produces test evidence."
-    },
-    {
-      "name": "reviewer",
-      "file": "agents/reviewer.md",
-      "description": "Independently inspects implementation changes, reviews security architecture and maintainability, identifies regressions and incomplete requirements, and verifies acceptance criteria."
-    }
-  ],
-  "skills": [
-    "skills/README.md"
-  ],
-  "workflows": [
-    "workflows/development/",
-    "workflows/debugging/",
-    "workflows/auditing/",
-    "workflows/research/",
-    "workflows/documentation/",
-    "workflows/modification/"
-  ],
-  "projects": [
-    "projects/scholars/",
-    "projects/resource-centre/",
-    "projects/serena/",
-    "projects/ai-video-factory/"
-  ],
-  "repository": {
-    "owner": "ImperioKDB",
-    "name": "agentic-workbench",
-    "private": true,
-    "default_branch": "main"
-  },
-  "boundaries": {
-    "task_003": "in_progress",
-    "do_not_modify": [
-      "ImperioKDB/Scholars",
-      "ImperioKDB/Scholars-Resource-Centre"
-    ],
-    "reporting_repo": "ImperioKDB/Updates",
-    "no_autonomous_merge": true,
-    "no_autonomous_deploy": true,
-    "no_credential_printing": true,
-    "no_secret_in_reports": true
-  },
-  "approval_gates": {
-    "consequential_implementation": "human",
-    "production_changes": "human",
-    "repository_creation": "human",
-    "pr_merge": "human",
-    "credential_rotation": "human"
-  }
+    "$schema":  "https://opencode.ai/config.json",
+    "default_agent":  "orchestrator",
+    "agents":  {
+               "orchestrator":  {
+                                         "description":  "Coordinates multi-agent orchestration workflows, decomposes tasks, delegates to specialists, enforces approval gates, and produces final execution summaries.",
+                                         "permissions":  [
+                                                             {
+                                                                 "effect":  "deny",
+                                                                 "resource":  "*",
+                                                                 "action":  "*"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "*",
+                                                                 "action":  "read"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "*",
+                                                                 "action":  "glob"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "*",
+                                                                 "action":  "grep"
+                                                             },
+                                                             {
+                                                                 "effect":  "deny",
+                                                                 "resource":  "*.env*",
+                                                                 "action":  "read"
+                                                             },
+                                                             {
+                                                                 "effect":  "deny",
+                                                                 "resource":  "*",
+                                                                 "action":  "external_directory"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "researcher",
+                                                                 "action":  "subagent"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "planner",
+                                                                 "action":  "subagent"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "developer",
+                                                                 "action":  "subagent"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "qa-engineer",
+                                                                 "action":  "subagent"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "reviewer",
+                                                                 "action":  "subagent"
+                                                             },
+                                                             {
+                                                                 "effect":  "allow",
+                                                                 "resource":  "reporter",
+                                                                 "action":  "subagent"
+                                                             }
+                                                         ],
+                                         "mode":  "primary",
+                                         "system":  "{file:agents/orchestrator.md}"
+                                     },
+               "researcher":  {
+                                       "description":  "Investigates codebases and documentation, researches technical solutions, compares implementation approaches, and produces evidence-based research reports.",
+                                       "permissions":  [
+                                                           {
+                                                               "effect":  "deny",
+                                                               "resource":  "*",
+                                                               "action":  "*"
+                                                           },
+                                                           {
+                                                               "effect":  "allow",
+                                                               "resource":  "*",
+                                                               "action":  "read"
+                                                           },
+                                                           {
+                                                               "effect":  "allow",
+                                                               "resource":  "*",
+                                                               "action":  "glob"
+                                                           },
+                                                           {
+                                                               "effect":  "allow",
+                                                               "resource":  "*",
+                                                               "action":  "grep"
+                                                           },
+                                                           {
+                                                               "effect":  "deny",
+                                                               "resource":  "*.env*",
+                                                               "action":  "read"
+                                                           },
+                                                           {
+                                                               "effect":  "deny",
+                                                               "resource":  "*",
+                                                               "action":  "external_directory"
+                                                           }
+                                                       ],
+                                       "mode":  "subagent",
+                                       "system":  "{file:agents/researcher.md}"
+                                   },
+               "planner":  {
+                                    "description":  "Converts requirements into implementation plans, identifies affected files and systems, defines acceptance criteria, and breaks work into independently verifiable stages.",
+                                    "permissions":  [
+                                                        {
+                                                            "effect":  "deny",
+                                                            "resource":  "*",
+                                                            "action":  "*"
+                                                        },
+                                                        {
+                                                            "effect":  "allow",
+                                                            "resource":  "*",
+                                                            "action":  "read"
+                                                        },
+                                                        {
+                                                            "effect":  "allow",
+                                                            "resource":  "*",
+                                                            "action":  "glob"
+                                                        },
+                                                        {
+                                                            "effect":  "allow",
+                                                            "resource":  "*",
+                                                            "action":  "grep"
+                                                        },
+                                                        {
+                                                            "effect":  "deny",
+                                                            "resource":  "*.env*",
+                                                            "action":  "read"
+                                                        },
+                                                        {
+                                                            "effect":  "deny",
+                                                            "resource":  "*",
+                                                            "action":  "external_directory"
+                                                        }
+                                                    ],
+                                    "mode":  "subagent",
+                                    "system":  "{file:agents/planner.md}"
+                                },
+               "developer":  {
+                                     "description":  "Implements approved changes following project conventions, creates isolated branches, writes maintainable code, and avoids unrelated modifications.",
+                                     "permissions":  [
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*",
+                                                             "action":  "*"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "read"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "glob"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "grep"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*.env*",
+                                                             "action":  "read"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*",
+                                                             "action":  "external_directory"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "write"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "create_branch"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "ImperioKDB/Scholars",
+                                                             "action":  "write"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "ImperioKDB/Scholars-Resource-Centre",
+                                                             "action":  "write"
+                                                         }
+                                                     ],
+                                     "mode":  "subagent",
+                                     "system":  "{file:agents/developer.md}"
+                                 },
+               "qa-engineer":  {
+                                        "description":  "Runs relevant tests, validates expected behaviour, detects regressions, verifies builds and configurations, and produces test evidence.",
+                                        "permissions":  [
+                                                            {
+                                                                "effect":  "deny",
+                                                                "resource":  "*",
+                                                                "action":  "*"
+                                                            },
+                                                            {
+                                                                "effect":  "allow",
+                                                                "resource":  "*",
+                                                                "action":  "read"
+                                                            },
+                                                            {
+                                                                "effect":  "allow",
+                                                                "resource":  "*",
+                                                                "action":  "glob"
+                                                            },
+                                                            {
+                                                                "effect":  "allow",
+                                                                "resource":  "*",
+                                                                "action":  "grep"
+                                                            },
+                                                            {
+                                                                "effect":  "deny",
+                                                                "resource":  "*.env*",
+                                                                "action":  "read"
+                                                            },
+                                                            {
+                                                                "effect":  "deny",
+                                                                "resource":  "*",
+                                                                "action":  "external_directory"
+                                                            }
+                                                        ],
+                                        "mode":  "subagent",
+                                        "system":  "{file:agents/qa-engineer.md}"
+                                    },
+               "reviewer":  {
+                                     "description":  "Independently inspects implementation changes, reviews security architecture and maintainability, identifies regressions and incomplete requirements, and verifies acceptance criteria.",
+                                     "permissions":  [
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*",
+                                                             "action":  "*"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "read"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "glob"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "grep"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*.env*",
+                                                             "action":  "read"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*",
+                                                             "action":  "external_directory"
+                                                         }
+                                                     ],
+                                     "mode":  "subagent",
+                                     "system":  "{file:agents/reviewer.md}"
+                                 },
+               "reporter":  {
+                                     "description":  "Receives execution evidence from the Orchestrator and specialist agents, produces structured Markdown reports, maintains persistent task histories, and prepares reports for authorized GitHub publication.",
+                                     "permissions":  [
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*",
+                                                             "action":  "*"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "read"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "glob"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "*",
+                                                             "action":  "grep"
+                                                         },
+                                                         {
+                                                             "effect":  "allow",
+                                                             "resource":  "reports/*",
+                                                             "action":  "write"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*.env*",
+                                                             "action":  "read"
+                                                         },
+                                                         {
+                                                             "effect":  "deny",
+                                                             "resource":  "*",
+                                                             "action":  "external_directory"
+                                                         }
+                                                     ],
+                                     "mode":  "subagent",
+                                     "system":  "{file:agents/reporter.md}"
+                                 }
+   }
 }

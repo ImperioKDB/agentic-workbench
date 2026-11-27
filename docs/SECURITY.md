@@ -24,11 +24,13 @@ Documents credential handling, least-privilege principles, tool boundaries, huma
 | Developer | Read all workbench files | Feature branches only in agentic-workbench; no Scholars writes |
 | QA Engineer | Read all workbench files | Test evidence reports only; no code changes |
 | Reviewer | Read all workbench files | Review reports only; no merges |
+| Reporter | Read task evidence only | Write to `reports/` only; no source code, no merge |
 
 ## Tool boundaries
 
 - Read-only defaults for research and planning agents.
 - Explicit write boundaries for the developer agent (isolated branches only).
+- Reporter write restricted to `reports/*` only.
 - No automatic merging (`no_autonomous_merge: true` in `opencode.json`).
 - No automatic deployments (`no_autonomous_deploy: true` in `opencode.json`).
 - No destructive database operations without explicit approval.
@@ -66,3 +68,5 @@ To prevent recurrence:
 - No sensitive terminal output is reproduced.
 - No private connection strings are included.
 - No secrets are committed to `ImperioKDB/agentic-workbench` or `ImperioKDB/Updates`.
+- Every substantive task must conclude with a Markdown execution report stored under `reports/TASK-ID-descriptive-title.md`.
+- Report publication to GitHub requires explicit human authorization; no agent may publish autonomously.

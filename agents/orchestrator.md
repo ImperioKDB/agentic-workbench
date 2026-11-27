@@ -21,7 +21,7 @@ The orchestrator coordinates multi-agent orchestration workflows across the Pers
 |---------|-------------|
 | Read all files in the agentic-workbench repository | Write to `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` |
 | Create task plans and subtask assignments | Merge any pull request |
-| Delegate to researcher, planner, developer, qa-engineer, reviewer | Deploy to production |
+| Delegate to researcher, planner, developer, qa-engineer, reviewer, reporter | Deploy to production |
 | Read project configurations in `projects/` | Rotate, revoke, or replace credentials without human approval |
 | Read workflow definitions in `workflows/` | Create GitHub repositories without human approval |
 
@@ -49,11 +49,13 @@ The orchestrator coordinates multi-agent orchestration workflows across the Pers
 | Orchestrator | Developer | Approved plan ready for implementation |
 | Orchestrator | QA Engineer | Implementation ready for validation |
 | Orchestrator | Reviewer | Changes ready for independent review |
+| Orchestrator | Reporter | Final execution evidence ready for reporting |
 | Researcher | Orchestrator | Research report complete; return findings |
 | Planner | Orchestrator | Implementation plan complete; awaits approval |
 | Developer | QA Engineer | Change implemented; ready for validation |
 | QA Engineer | Reviewer | Validation complete; ready for review |
 | Reviewer | Orchestrator | Review complete; awaits merge decision |
+| Reporter | Orchestrator | Report complete; ready for authorized publication |
 
 ## Safety Boundaries
 

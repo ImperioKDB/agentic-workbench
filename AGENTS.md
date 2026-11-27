@@ -8,7 +8,7 @@ This repository is an independent, private OpenCode-native agentic orchestration
 
 ## Agents
 
-Six agents are implemented in `agents/`:
+Seven agents are implemented in `agents/`:
 
 - **Orchestrator** (`agents/orchestrator.md`) — coordinates workflows, decomposes tasks, delegates to specialists, enforces approval gates
 - **Researcher** (`agents/researcher.md`) — investigates codebases, researches solutions, produces evidence-based reports
@@ -16,6 +16,7 @@ Six agents are implemented in `agents/`:
 - **Developer** (`agents/developer.md`) — implements approved changes on isolated branches
 - **QA Engineer** (`agents/qa-engineer.md`) — runs tests, validates behaviour, produces test evidence
 - **Reviewer** (`agents/reviewer.md`) — independently inspects changes, reviews security and maintainability
+- **Reporter** (`agents/reporter.md`) — receives execution evidence, produces structured Markdown reports, maintains persistent task histories
 
 Each agent specification defines its role, responsibilities, permissions, inputs, outputs, handoff rules, and safety boundaries.
 
@@ -42,6 +43,7 @@ The following operations require explicit human approval before execution:
 3. Beginning Task 003 implementation stages that modify production projects.
 4. Rotating, revoking, or replacing any GitHub credential.
 5. Any write operation against `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre`.
+6. Publishing execution reports to GitHub (including `ImperioKDB/Updates` reporting branches).
 
 ## Repository isolation
 
@@ -66,6 +68,8 @@ The following operations require explicit human approval before execution:
 
 ## Task 003 boundary
 
-Task 003 (multi-agent orchestration foundation implementation) is in progress. The repository's initial foundation has been created, committed, pushed, and remotely verified. Agent specifications, workflow definitions, and project configurations are implemented. Documentation, testing, and reporting remain pending.
+Task 003 (multi-agent orchestration foundation implementation) is complete. The repository's initial foundation has been created, committed, pushed, and remotely verified. Agent specifications, workflow definitions, project configurations, documentation, testing, and reporting are implemented.
+
+Task 004 (runtime hardening and persistent reporting) is in progress. Seven agents are implemented. Native OpenCode V2 integration, dependency-aware orchestration, least-privilege permissions, expanded secret scanning, mandatory reporting, and documentation reconciliation are implemented or in progress.
 
 Do not modify `ImperioKDB/Scholars` or `ImperioKDB/Scholars-Resource-Centre` without explicit human approval.

@@ -4,7 +4,7 @@
 
 ## System overview
 
-The Personal Agentic Workbench is a reusable, OpenCode-native agentic orchestration foundation. It coordinates specialist agents (orchestrator, researcher, planner, developer, qa-engineer, reviewer) through defined workflows to manage agentic development across multiple registered projects.
+The Personal Agentic Workbench is a reusable, OpenCode-native agentic orchestration foundation. It coordinates specialist agents (orchestrator, researcher, planner, developer, qa-engineer, reviewer, reporter) through defined workflows to manage agentic development across multiple registered projects.
 
 The system is repository-centric: all agent specifications, workflow definitions, project configurations, and documentation live in this repository (`ImperioKDB/agentic-workbench`). Registered projects (scholars, resource-centre, serena, ai-video-factory) are described descriptively in `projects/`; this repository does not write to them without explicit human approval.
 
@@ -25,6 +25,8 @@ Handoff rules are defined in each agent specification (`agents/*.md`). Key hando
 - Developer → QA Engineer (implementation ready for validation)
 - QA Engineer → Reviewer (validation complete)
 - Reviewer → Orchestrator (review complete)
+- Orchestrator → Reporter (execution evidence ready for reporting)
+- Reporter → Orchestrator (report complete; ready for authorized publication)
 
 ## Workflow execution model
 
@@ -37,7 +39,7 @@ Six workflows are defined in `workflows/`:
 6. **modification** — existing project modification
 
 Every development workflow follows the same agent sequence:
-User request → Orchestrator → Researcher (when needed) → Planner → User approval → Developer → QA Engineer → Independent Reviewer → Execution report → Pull request → Human review and merge → Deployment only when separately authorized.
+User request → Orchestrator → Researcher (when needed) → Planner → User approval → Developer → QA Engineer → Independent Reviewer → Orchestrator (consolidate evidence) → Reporter (produce execution report) → Pull request → Human review and merge → Deployment only when separately authorized.
 
 ## Approval gates
 
@@ -68,4 +70,6 @@ No cross-repository writes are performed by this project. Project configurations
 - Repository metadata (owner, name, visibility, default branch)
 - Security boundaries and approval gates
 
-Agent specifications live in `agents/*.md`. Workflow definitions live in `workflows/*/README.md`. Project configurations live in `projects/*/config.json` with a registry at `projects/registry.json`.
+Agent specifications live in `agents/*.md`. Workflow definitions live in `workflows/*/README.md`. Project configurations live in `projects/*/config.json` with a registry at `projects/registry.json`. Execution reports are stored under `reports/`.
+
+`opencode.json` records `no_autonomous_merge: true` and `no_autonomous_deploy: true`. The Reporter's write permission is restricted to `reports/*` only.

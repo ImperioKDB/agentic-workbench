@@ -25,7 +25,9 @@ QA Engineer
     ↓
 Independent Reviewer
     ↓
-Execution report
+Orchestrator (consolidate execution evidence)
+    ↓
+Reporter (produce execution report)
     ↓
 Pull request
     ↓
@@ -94,21 +96,27 @@ The reviewer independently inspects the changes:
 
 ### 9. Execution report
 
-The orchestrator compiles an execution report summarizing:
+The orchestrator compiles execution evidence from all participating agents and delegates report production to the Reporter. The Reporter produces a structured Markdown execution report summarizing:
 - What was done and which agents participated
 - What was approved and when
 - Test results and review outcome
+- Delegation and handoff evidence
 - Any outstanding items
+- Files inspected, created, or modified
 
-### 10. Pull request
+### 10. Reporter publication preparation
+
+The Reporter prepares the execution report for authorized GitHub publication. The report is stored under `reports/TASK-ID-descriptive-title.md`. Publication to the designated reporting branch requires explicit human authorization; no agent may publish autonomously.
+
+### 11. Pull request
 
 The orchestrator creates a pull request from the feature branch to `main` with the execution report as the PR description. The PR must not be merged by any agent.
 
-### 11. Human review and merge
+### 12. Human review and merge
 
 A human reviews the pull request and decides whether to merge. No agent may merge a pull request.
 
-### 12. Deployment only when separately authorized
+### 13. Deployment only when separately authorized
 
 Deployment to production occurs only when separately authorized by a human. No agent may trigger a deployment.
 
@@ -117,6 +125,7 @@ Deployment to production occurs only when separately authorized by a human. No a
 | Gate | Required Approver | When |
 |------|-------------------|------|
 | Consequential implementation | Human | Before developer starts work |
+| Report publication | Human | Before report is published to GitHub |
 | Production changes | Human | Before any production change |
 | PR merge | Human | Before any merge to main |
 | Deployment | Human | Separately authorized, after merge |
