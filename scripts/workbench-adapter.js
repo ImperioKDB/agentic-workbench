@@ -57,6 +57,7 @@ const OPENAI_SCHEMA = "https://opencode.ai/config.json";
 
 const CONFIG_DIR_NAME = ".opencode";
 const CONFIG_FILE_NAME = "opencode.json";
+const CONFIG_FILE_NAME_C = "opencode.jsonc";
 const LEGACY_CONFIG_FILE = ".opencode.json";
 const LEGACY_CONFIG_FILE_C = ".opencode.jsonc";
 const META_FILENAME = "adapter-meta.json";
@@ -133,10 +134,22 @@ function printUsage() {
 // --- Path helpers -------------------------------------------------------------
 
 function canonicalize(dir) {
+  const resolved = path.resolve(dir);
   try {
-    return fs.realpathSync(dir);
+    return fs.realpathSync(resolved);
   } catch (e) {
-    return path.resolve(dir);
+    // Path does not exist or has a broken symlink. Resolve existing parent
+    // directories with realpathSync, then append the nonexistent component so
+    // that symlinked parents are detected even when the final path does not
+    // yet exist.
+    const parent = path.dirname(resolved);
+    let canonicalParent;
+    try {
+      canonicalParent = fs.realpathSync(parent);
+    } catch (e2) {
+      canonicalParent = canonicalize(parent);
+    }
+    return path.join(canonicalParent, path.basename(resolved));
   }
 }
 
@@ -145,12 +158,41 @@ function isContained(child, parent) {
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-function configDirPath(targetDir) {
-  return path.join(targetDir, CONFIG_DIR_NAME);
+function isSymlinkOrJunction(filePath) {
+  try {
+    const stat = fs.lstatSync(filePath);
+    return stat.isSymbolicLink();
+  } catch (e) {
+    return false;
+  }
+}
+
+function rejectSymlinkDestination(filePath, contextLabel) {
+  if (isSymlinkOrJunction(filePath)) {
+    fail(`Refusing to write ${contextLabel}: ${filePath} is a symbolic link or junction.`);
+  }
+  // Also check parent directories for symlinks that could redirect writes.
+  const resolved = path.resolve(filePath);
+  let dir = path.dirname(resolved);
+  const root = path.parse(resolved).root;
+  while (dir !== root) {
+    if (isSymlinkOrJunction(dir)) {
+      fail(`Refusing to write ${contextLabel}: parent directory ${dir} is a symbolic link or junction.`);
+    }
+    dir = path.dirname(dir);
+  }
+}
+
+function configPathC(targetDir) {
+  return path.join(targetDir, CONFIG_DIR_NAME, CONFIG_FILE_NAME_C);
 }
 
 function configPath(targetDir) {
   return path.join(targetDir, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
+}
+
+function configDirPath(targetDir) {
+  return path.join(targetDir, CONFIG_DIR_NAME);
 }
 
 function legacyConfigPath(targetDir) {
@@ -161,8 +203,12 @@ function legacyConfigPathC(targetDir) {
   return path.join(targetDir, LEGACY_CONFIG_FILE_C);
 }
 
-function dirConfigPathC(targetDir) {
-  return path.join(targetDir, CONFIG_DIR_NAME, LEGACY_CONFIG_FILE_C);
+function rootConfigPath(targetDir) {
+  return path.join(targetDir, CONFIG_FILE_NAME);
+}
+
+function rootConfigPathC(targetDir) {
+  return path.join(targetDir, CONFIG_FILE_NAME_C);
 }
 
 // --- Workbench validation -----------------------------------------------------
@@ -468,14 +514,16 @@ function readConfigFileIfExists(filePath) {
 }
 
 function detectExistingConfigurations(targetDir) {
-  // Returns { dirConfig, legacyConfig, jsoncConfig, dirConfigC, conflict }
-  // where conflict is true when any two configs exist with different content.
+  // Returns all discovered configurations and a conflict flag.
+  // Conflict is true when any two configs exist with different content.
   const dirCfg = readConfigFileIfExists(configPath(targetDir));
+  const dirCfgC = readConfigFileIfExists(configPathC(targetDir));
   const legacyCfg = readConfigFileIfExists(legacyConfigPath(targetDir));
-  const jsoncCfg = readConfigFileIfExists(legacyConfigPathC(targetDir));
-  const dirCfgC = readConfigFileIfExists(dirConfigPathC(targetDir));
+  const legacyCfgC = readConfigFileIfExists(legacyConfigPathC(targetDir));
+  const rootCfg = readConfigFileIfExists(rootConfigPath(targetDir));
+  const rootCfgC = readConfigFileIfExists(rootConfigPathC(targetDir));
   let conflict = false;
-  const cfgs = [dirCfg, legacyCfg, jsoncCfg, dirCfgC].filter((c) => c !== null);
+  const cfgs = [dirCfg, dirCfgC, legacyCfg, legacyCfgC, rootCfg, rootCfgC].filter((c) => c !== null);
   for (let i = 0; i < cfgs.length; i++) {
     for (let j = i + 1; j < cfgs.length; j++) {
       if (cfgs[i] !== cfgs[j]) {
@@ -485,7 +533,15 @@ function detectExistingConfigurations(targetDir) {
     }
     if (conflict) break;
   }
-  return { dirConfig: dirCfg, legacyConfig: legacyCfg, jsoncConfig: jsoncCfg, dirConfigC: dirCfgC, conflict };
+  return {
+    dirConfig: dirCfg,
+    dirConfigC: dirCfgC,
+    legacyConfig: legacyCfg,
+    legacyConfigC: legacyCfgC,
+    rootConfig: rootCfg,
+    rootConfigC: rootCfgC,
+    conflict,
+  };
 }
 
 // --- Backup / rollback --------------------------------------------------------
@@ -509,17 +565,36 @@ function ensureGitignoreEntries(targetDir, dryRun) {
   const entries = [".opencode/", ".workbench-backups/"];
   let existing = "";
   if (fs.existsSync(gitignorePath)) {
+    rejectSymlinkDestination(gitignorePath, ".gitignore updates");
     existing = fs.readFileSync(gitignorePath, "utf8");
   }
-  const missing = entries.filter((e) => !existing.split("\n").includes(e));
+  const lines = existing.split(/\r?\n/);
+  const missing = entries.filter((e) => !lines.includes(e));
   if (missing.length === 0) return;
   if (dryRun) {
     log(`[dry-run] Would append to ${gitignorePath}: ${missing.join(", ")}`);
     return;
   }
-  const append = existing.endsWith("\n") ? "" : "\n";
+  const append = existing.length > 0 && !existing.endsWith("\n") && !existing.endsWith("\r") ? "\n" : "";
   fs.appendFileSync(gitignorePath, append + missing.join("\n") + "\n", "utf8");
   log(`Updated ${gitignorePath} with workbench-generated path exclusions.`);
+}
+
+function reconcileGitignore(targetDir, dryRun) {
+  const gitignorePath = path.join(targetDir, ".gitignore");
+  if (!fs.existsSync(gitignorePath)) return;
+  rejectSymlinkDestination(gitignorePath, ".gitignore reconciliation");
+  let existing = fs.readFileSync(gitignorePath, "utf8");
+  const lines = existing.split(/\r?\n/);
+  // Remove adapter-added entries (but not user-added ones).
+  const filtered = lines.filter((line) => line !== ".opencode/" && line !== ".workbench-backups/");
+  const normalized = filtered.join("\n").replace(/\n+$/, "") + "\n";
+  if (dryRun) {
+    log(`[dry-run] Would reconcile ${gitignorePath}`);
+    return;
+  }
+  fs.writeFileSync(gitignorePath, normalized, "utf8");
+  log(`Reconciled ${gitignorePath} after rollback.`);
 }
 
 function backupExistingConfig(configPathTarget, backupsDir, dryRun) {
@@ -555,7 +630,7 @@ function findLatestBackup(targetDir) {
   return path.join(backupsDir, entries[0]);
 }
 
-function writeMetaFile(backupsDir, targetDir, workbenchRoot, configHash) {
+function writeMetaFile(backupsDir, targetDir, workbenchRoot, configHash, preExisting = false, preExistingPath = null) {
   const meta = {
     adapter: "workbench-adapter",
     target_dir: targetDir,
@@ -564,6 +639,8 @@ function writeMetaFile(backupsDir, targetDir, workbenchRoot, configHash) {
     config_hash: configHash,
     owner: currentOwner(),
     created_at: new Date().toISOString(),
+    pre_existing: preExisting,
+    pre_existing_path: preExistingPath,
   };
   fs.writeFileSync(
     path.join(backupsDir, META_FILENAME),
@@ -600,6 +677,13 @@ function rollback(targetDir, dryRun) {
     );
   }
 
+  // Verify mandatory metadata fields.
+  for (const field of ["target_dir", "config_hash", "owner", "created_at"]) {
+    if (meta[field] === undefined || meta[field] === null) {
+      fail(`Refusing to roll back: missing mandatory metadata field "${field}".`);
+    }
+  }
+
   // Verify adapter ownership: only the adapter owner can roll back its own config.
   if (meta.owner && meta.owner !== currentOwner()) {
     fail(
@@ -614,6 +698,7 @@ function rollback(targetDir, dryRun) {
     );
   }
 
+  const preExisting = meta.pre_existing === true;
   const backupConfig = path.join(backupDir, CONFIG_FILE_NAME);
   const backupHashFile = path.join(backupDir, `${CONFIG_FILE_NAME}.sha256`);
 
@@ -633,29 +718,57 @@ function rollback(targetDir, dryRun) {
     );
   }
 
-  // Refuse to overwrite configs modified since installation: compare the
-  // installed config's current hash against the recorded config hash.
   const installedCfg = configPath(targetDir);
-  if (fs.existsSync(installedCfg)) {
-    const installedHash = sha256File(installedCfg);
-    if (installedHash !== meta.config_hash) {
-      fail(
-        `Refusing to roll back: installed config at ${installedCfg} has been modified since installation (recorded hash ${meta.config_hash}, current ${installedHash}).`
-      );
+
+  if (preExisting) {
+    // Restore the pre-existing configuration to its original location.
+    const preExistingPath = meta.pre_existing_path;
+    if (!preExistingPath) {
+      fail("Refusing to roll back: missing pre_existing_path in metadata.");
+    }
+    if (dryRun) {
+      log(`[dry-run] Would restore pre-existing config from ${backupConfig} to ${preExistingPath}`);
+      return;
+    }
+    rejectSymlinkDestination(preExistingPath, "pre-existing configuration");
+    const tempPath = preExistingPath + ".tmp";
+    fs.copyFileSync(backupConfig, tempPath);
+    fs.renameSync(tempPath, preExistingPath);
+    log(`Restored pre-existing configuration at ${preExistingPath}`);
+  } else {
+    // First-time installation: remove only the verified adapter-generated
+    // configuration. Do not touch unrelated files.
+    if (dryRun) {
+      log(`[dry-run] Would remove adapter-generated config at ${installedCfg}`);
+      return;
+    }
+    // Refuse to remove configs modified since installation.
+    if (fs.existsSync(installedCfg)) {
+      const installedHash = sha256File(installedCfg);
+      if (installedHash !== meta.config_hash) {
+        fail(
+          `Refusing to roll back: installed config at ${installedCfg} has been modified since installation (recorded hash ${meta.config_hash}, current ${installedHash}).`
+        );
+      }
+      rejectSymlinkDestination(installedCfg, "adapter-generated configuration");
+      fs.unlinkSync(installedCfg);
+      log(`Removed adapter-generated config at ${installedCfg}`);
+    }
+    // Remove the .opencode directory if it is now empty.
+    const cfgDir = configDirPath(targetDir);
+    if (fs.existsSync(cfgDir)) {
+      const entries = fs.readdirSync(cfgDir);
+      if (entries.length === 0) {
+        fs.rmdirSync(cfgDir);
+        log(`Removed empty config directory ${cfgDir}`);
+      }
     }
   }
 
-  if (dryRun) {
-    log(`[dry-run] Would restore ${backupConfig} to ${installedCfg}`);
-    return;
-  }
+  // Reconcile adapter-added .gitignore entries without removing unrelated user changes.
+  reconcileGitignore(targetDir, dryRun);
 
-  // Restore atomically: write to temp file then rename.
-  const tempPath = installedCfg + ".tmp";
-  fs.copyFileSync(backupConfig, tempPath);
-  fs.renameSync(tempPath, installedCfg);
-
-  log(`Rolled back ${installedCfg} from ${backupConfig}`);
+  log(`Rollback complete for ${targetDir}`);
 }
 
 // --- Main flow ----------------------------------------------------------------
@@ -700,15 +813,34 @@ function main() {
     : [];
 
   // Detect existing configurations in all known locations.
-  const { dirConfig, legacyConfig, jsoncConfig, dirConfigC, conflict } = detectExistingConfigurations(targetAbs);
+  const {
+    dirConfig,
+    dirConfigC,
+    legacyConfig,
+    legacyConfigC,
+    rootConfig,
+    rootConfigC,
+    conflict,
+  } = detectExistingConfigurations(targetAbs);
 
   if (conflict) {
     fail(
-      `Conflicting OpenCode configurations detected in ${targetAbs}: multiple OpenCode config locations exist with different content (${CONFIG_DIR_NAME}/${CONFIG_FILE_NAME}, ${CONFIG_DIR_NAME}/${LEGACY_CONFIG_FILE_C}, legacy ${LEGACY_CONFIG_FILE}, legacy ${LEGACY_CONFIG_FILE_C}). Refusing to silently override or merge. Remove conflicting configs manually to proceed.`
+      `Conflicting OpenCode configurations detected in ${targetAbs}: multiple OpenCode config locations exist with different content (${CONFIG_DIR_NAME}/${CONFIG_FILE_NAME}, ${CONFIG_DIR_NAME}/${CONFIG_FILE_NAME_C}, legacy ${LEGACY_CONFIG_FILE}, legacy ${LEGACY_CONFIG_FILE_C}, root-level ${CONFIG_FILE_NAME}, root-level ${CONFIG_FILE_NAME_C}). Refusing to silently override or merge. Remove conflicting configs manually to proceed.`
     );
   }
 
-  const existingConfig = dirConfig !== null ? dirConfig : legacyConfig !== null ? legacyConfig : jsoncConfig !== null ? jsoncConfig : dirConfigC;
+  const existingConfig =
+    dirConfig !== null
+      ? dirConfig
+      : dirConfigC !== null
+      ? dirConfigC
+      : legacyConfig !== null
+      ? legacyConfig
+      : legacyConfigC !== null
+      ? legacyConfigC
+      : rootConfig !== null
+      ? rootConfig
+      : rootConfigC;
   const configExists = existingConfig !== null;
 
   if (configExists) {
@@ -732,24 +864,20 @@ function main() {
   }
 
   const targetConfigDir = configDirPath(targetAbs);
+  rejectSymlinkDestination(targetConfigDir, "config directory");
   ensureDir(targetConfigDir);
 
-  // Back up any existing config before writing (legacy .opencode.json).
-  if (legacyConfig !== null) {
-    const backupsDir = path.join(targetAbs, ".workbench-backups", timestamp());
-    backupExistingConfig(legacyConfigPath(targetAbs), backupsDir, false);
-    writeMetaFile(backupsDir, targetAbs, workbenchRootAbs, configHash);
-  }
-
-  // Write to temp file then rename for atomicity.
-  const finalConfigPath = configPath(targetAbs);
-  const tempPath = finalConfigPath + ".tmp";
+  // Write to a secure temporary file then rename for atomicity.
+  const tmpDir = fs.mkdtempSync(path.join(targetAbs, ".workbench-adapter-tmp-"));
+  const tempPath = path.join(tmpDir, CONFIG_FILE_NAME);
   fs.writeFileSync(tempPath, configJson, "utf8");
+  const finalConfigPath = configPath(targetAbs);
   fs.renameSync(tempPath, finalConfigPath);
+  fs.rmdirSync(tmpDir);
 
   // Record ownership + SHA-256 hash alongside the generated config for
   // future rollback verification. Back up the generated config itself so
-  // rollback can restore it byte-for-byte.
+  // rollback can remove it byte-for-byte.
   const backupsDir = path.join(targetAbs, ".workbench-backups", timestamp());
   ensureDir(backupsDir);
   fs.copyFileSync(finalConfigPath, path.join(backupsDir, CONFIG_FILE_NAME));
@@ -758,7 +886,7 @@ function main() {
     configHash + "\n",
     "utf8"
   );
-  writeMetaFile(backupsDir, targetAbs, workbenchRootAbs, configHash);
+  writeMetaFile(backupsDir, targetAbs, workbenchRootAbs, configHash, false);
 
   log(`Generated project-scoped config: ${finalConfigPath}`);
   log(`Registered ${AGENT_NAMES.length} agents (orchestrator primary, specialists subagent).`);

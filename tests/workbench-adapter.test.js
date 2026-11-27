@@ -29,6 +29,7 @@ const CONFIG_DIR = ".opencode";
 const CONFIG_FILE = "opencode.json";
 const LEGACY_CONFIG_FILE = ".opencode.json";
 const LEGACY_CONFIG_FILE_C = ".opencode.jsonc";
+const META_FILENAME = "adapter-meta.json";
 
 // --- Test harness -------------------------------------------------------------
 
@@ -304,11 +305,12 @@ test("rollback: restores config byte-for-byte when hash matches", (dir) => {
   const configPath = path.join(target, CONFIG_DIR, CONFIG_FILE);
   const original = fs.readFileSync(configPath, "utf8");
 
-  // Rollback must restore the backed-up original when nothing has changed.
+  // Rollback of a first-time installation removes the generated config
+  // (it did not exist before installation).
   waitForNewMillisecond();
   const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
   assert(out.ok, `rollback should succeed; got ${out.status}: ${out.combined}`);
-  assertEqual(fs.readFileSync(configPath, "utf8"), original, "config must be restored byte-for-byte");
+  assert(!fs.existsSync(configPath), "first-time install rollback must remove generated config");
 });
 
 test("rollback: refuses to rollback modified configuration", (dir) => {
@@ -463,6 +465,164 @@ test("project-specific command permissions: no context means no extra shell asks
   const devPerms = config.agents.developer.permissions;
   const devShellAsks = devPerms.filter((p) => p.action === "shell" && p.effect === "ask");
   assertEqual(devShellAsks.length, 0, "no project context means no extra shell ask rules");
+});
+
+test("gitignore: original protections remain intact", () => {
+  const gitignorePath = path.join(WORKBENCH_ROOT, ".gitignore");
+  const content = fs.readFileSync(gitignorePath, "utf8");
+  const required = [
+    ".opencode/",
+    ".workbench-backups/",
+    "node_modules/",
+    ".env",
+    "*.log",
+    ".DS_Store",
+  ];
+  for (const entry of required) {
+    assert(content.includes(entry), `.gitignore should contain "${entry}"`);
+  }
+});
+
+test("gitignore: existing target content is preserved", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(target, ".gitignore"), "# user rule\nuser-file.txt\n", "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb]);
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
+
+  const content = fs.readFileSync(path.join(target, ".gitignore"), "utf8");
+  assert(content.includes("# user rule"), "existing .gitignore content must be preserved");
+  assert(content.includes("user-file.txt"), "existing .gitignore content must be preserved");
+  assert(content.includes(".opencode/"), "workbench exclusion should be added");
+  assert(content.includes(".workbench-backups/"), "workbench exclusion should be added");
+});
+
+test("gitignore: LF and CRLF handling", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+  // Write .gitignore with CRLF line endings.
+  fs.writeFileSync(path.join(target, ".gitignore"), "# user rule\r\nuser-file.txt\r\n", "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb]);
+  assert(out.ok, `adapter should succeed; got ${out.status}: ${out.combined}`);
+
+  const content = fs.readFileSync(path.join(target, ".gitignore"), "utf8");
+  assert(content.includes(".opencode/"), "workbench exclusion should be added with CRLF");
+  assert(content.includes(".workbench-backups/"), "workbench exclusion should be added with CRLF");
+  // Verify no duplicate entries on second run.
+  const second = runAdapter([target, "--workbench-root", wb]);
+  assert(second.ok, "second run should succeed");
+  const content2 = fs.readFileSync(path.join(target, ".gitignore"), "utf8");
+  const opencodeCount = (content2.match(/\.opencode\//g) || []).length;
+  const backupsCount = (content2.match(/\.workbench-backups\//g) || []).length;
+  assertEqual(opencodeCount, 1, ".opencode/ should appear exactly once");
+  assertEqual(backupsCount, 1, ".workbench-backups/ should appear exactly once");
+});
+
+test("rollback: incorrect ownership causes refusal", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const first = runAdapter([target, "--workbench-root", wb]);
+  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+
+  // Tamper with the owner in the meta file.
+  const backupsDir = path.join(target, ".workbench-backups");
+  const backupDirs = fs.readdirSync(backupsDir).filter((e) =>
+    fs.statSync(path.join(backupsDir, e)).isDirectory()
+  );
+  assert(backupDirs.length > 0, "backup directory should exist");
+  const metaPath = path.join(backupsDir, backupDirs[0], META_FILENAME);
+  const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+  meta.owner = "someone-else";
+  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(!out.ok, "rollback with wrong owner should fail");
+  assert(out.combined.includes("owner"), "expected ownership refusal message");
+});
+
+test("rollback: incorrect target identity causes refusal", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const first = runAdapter([target, "--workbench-root", wb]);
+  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+
+  // Tamper with the target_dir in the meta file.
+  const backupsDir = path.join(target, ".workbench-backups");
+  const backupDirs = fs.readdirSync(backupsDir).filter((e) =>
+    fs.statSync(path.join(backupsDir, e)).isDirectory()
+  );
+  assert(backupDirs.length > 0, "backup directory should exist");
+  const metaPath = path.join(backupsDir, backupDirs[0], META_FILENAME);
+  const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+  meta.target_dir = "/some/other/target";
+  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(!out.ok, "rollback with wrong target identity should fail");
+  assert(out.combined.includes("target"), "expected target identity refusal message");
+});
+
+test("rollback: path containment", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const first = runAdapter([target, "--workbench-root", wb]);
+  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+
+  const configPath = path.join(target, CONFIG_DIR, CONFIG_FILE);
+
+  // Rollback should succeed (normal case).
+  const out1 = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(out1.ok, `rollback should succeed; got ${out1.status}: ${out1.combined}`);
+  assert(!fs.existsSync(configPath), "config should be removed after rollback");
+});
+
+test("installation failure does not leave partial installation", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  // Run with an invalid workbench root to force failure before any writes.
+  const out = runAdapter([target, "--workbench-root", path.join(dir, "nonexistent")]);
+  assert(!out.ok, "adapter should fail with bad workbench root");
+
+  // Target should remain clean.
+  assert(!fs.existsSync(path.join(target, CONFIG_DIR)), "config dir should not exist after failed install");
+  assert(!fs.existsSync(path.join(target, ".workbench-backups")), "backups dir should not exist after failed install");
+});
+
+test("rollback preserves unrelated files created after installation", (dir) => {
+  const wb = path.join(dir, "wb");
+  makeAgentsDir(wb);
+  const target = path.join(dir, "target");
+  fs.mkdirSync(target, { recursive: true });
+
+  const first = runAdapter([target, "--workbench-root", wb]);
+  assert(first.ok, `first run should succeed; got ${first.status}: ${first.combined}`);
+
+  // Create an unrelated file after installation.
+  const unrelatedFile = path.join(target, "unrelated-user-file.txt");
+  fs.writeFileSync(unrelatedFile, "user data\n", "utf8");
+
+  const out = runAdapter([target, "--workbench-root", wb, "--rollback"]);
+  assert(out.ok, `rollback should succeed; got ${out.status}: ${out.combined}`);
+  assert(fs.existsSync(unrelatedFile), "unrelated file must be preserved after rollback");
+  assertEqual(fs.readFileSync(unrelatedFile, "utf8"), "user data\n", "unrelated file content must be unchanged");
 });
 
 // --- Summary ------------------------------------------------------------------

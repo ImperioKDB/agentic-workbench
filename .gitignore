@@ -1,3 +1,46 @@
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+credentials.json
+*.secret*
+*.pem
+*.key
+
+# Dependency directories
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs and coverage files
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# IDE and operating system artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Generated archives and temporary files
+*.zip
+*.tar.gz
+*.tmp
+*.temp
+temp/
+tmp/
+
 # Workbench adapter-generated files in target project directories
 .opencode/
 .workbench-backups/
