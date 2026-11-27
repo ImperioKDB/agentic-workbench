@@ -22,7 +22,7 @@
 - **Repository:** https://github.com/ImperioKDB/agentic-workbench.git
 - **Branch:** `chore/opencode-v2-integration`
 - **Starting commit:** `b59cfcf02f61c4af89c210df752d1c0f044251fd`
-- **Ending commit:** `94ece29173f1758b79a0900417bbead56f9a674e` (Task 005 commit, still HEAD as this task builds on it)
+- **Ending commit:** `7b498f6304a6d51bc1e9d08d47941fe7026a4648` (Task 006.2 completion + Task 006.3 hardening)
 
 ## Participating Agents
 
@@ -127,7 +127,7 @@ The validator confirms:
 ### Test 2: `node tests/workbench-adapter.test.js`
 
 **Exit code:** 0  
-**Result:** PASSED — 21 passed, 0 failed
+**Result:** PASSED — 29 passed, 0 failed
 
 | Test | Result |
 |------|--------|
@@ -153,6 +153,14 @@ The validator confirms:
 | project-specific command permissions: derived from dev_test_commands | PASS |
 | project-specific command permissions: no arbitrary commands auto-allowed | PASS |
 | project-specific command permissions: no context means no extra shell asks | PASS |
+| gitignore: original protections remain intact | PASS |
+| gitignore: existing target content is preserved | PASS |
+| gitignore: LF and CRLF handling | PASS |
+| rollback: incorrect ownership causes refusal | PASS |
+| rollback: incorrect target identity causes refusal | PASS |
+| rollback: path containment | PASS |
+| installation failure does not leave partial installation | PASS |
+| rollback preserves unrelated files created after installation | PASS |
 
 ## Security and Regression Findings
 
@@ -213,7 +221,7 @@ None required — publication to `chore/opencode-v2-integration` is explicitly a
 5. ✅ Symlink/junction escape rejection in config destination
 6. ✅ Workbench-Specific Restrictions made conditional in all 7 agent specs
 7. ✅ Adapter-specific tests added to GitHub Actions workflow (duplicate step removed)
-8. ✅ Both `node tests/validate.js` (exit code 0) and `node tests/workbench-adapter.test.js` (21 passed, 0 failed) executed locally
+8. ✅ Both `node tests/validate.js` (exit code 0) and `node tests/workbench-adapter.test.js` (29 passed, 0 failed) executed locally
 9. ✅ Report created at `reports/TASK-006.2-adapter-acceptance.md`
 10. ✅ Committed and pushed to `chore/opencode-v2-integration`
 
